@@ -3,6 +3,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -87,4 +102,19 @@
 
 .slider-control::-webkit-slider-thumb {
   @apply appearance-none w-4 h-4 rounded-full bg-banana border-none;
+}
+/* Add this to app/globals.css */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
 }
