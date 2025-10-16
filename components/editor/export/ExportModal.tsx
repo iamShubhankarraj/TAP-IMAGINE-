@@ -242,7 +242,7 @@ export default function ExportModal({
                     <div className="text-center py-12 border-2 border-dashed border-white/20 rounded-xl">
                       <Settings className="h-12 w-12 text-white/30 mx-auto mb-3" />
                       <p className="text-white/60">No custom configurations yet</p>
-                      <p className="text-white/40 text-sm mt-1">Click "Add Configuration" to create one</p>
+                      <p className="text-white/40 text-sm mt-1">Click &quot;Add Configuration&quot; to create one</p>
                     </div>
                   ) : (
                     <div className="space-y-3">

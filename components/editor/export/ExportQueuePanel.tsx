@@ -37,7 +37,7 @@ export default function ExportQueuePanel() {
     }
   };
 
-  const handleDownload = (job: any) => {
+  const handleDownload = (job: { result?: Blob; filename?: string }) => {
     if (job.result && job.filename) {
       downloadBlob(job.result, job.filename);
     }

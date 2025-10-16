@@ -53,7 +53,7 @@ export async function getUserProfile(userId: string) {
  * @param userId The user ID to update profile for
  * @param updates The profile updates to apply
  */
-export async function updateUserProfile(userId: string, updates: any) {
+export async function updateUserProfile(userId: string, updates: Record<string, unknown>) {
   try {
     const { data, error } = await supabase
       .from('profiles')
