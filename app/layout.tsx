@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/context/auth-context';
 import { ImageStoreProvider } from '@/context/image-store';
+import { ExportQueueProvider } from '@/context/export-queue-context';
 import Navbar from '@/components/layout/Navbar';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -23,10 +24,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <ImageStoreProvider>
-            <Navbar />
-            <main className="container mx-auto px-4 py-8">
-              {children}
-            </main>
+            <ExportQueueProvider>
+              <Navbar />
+              <main className="container mx-auto px-4 py-8">
+                {children}
+              </main>
+            </ExportQueueProvider>
           </ImageStoreProvider>
         </AuthProvider>
       </body>
