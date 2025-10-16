@@ -1,0 +1,356 @@
+{
+  "categories": [
+    {
+      "id": "ai-transformations",
+      "name": "AI Transformations",
+      "description": "Intelligent image generation and manipulation powered by cutting-edge AI",
+      "icon": "Wand2"
+    },
+    {
+      "id": "editing-tools",
+      "name": "Editing Tools",
+      "description": "Professional-grade image adjustment and manipulation tools",
+      "icon": "Palette"
+    },
+    {
+      "id": "templates",
+      "name": "Creative Templates",
+      "description": "Pre-built styles and effects for instant transformations",
+      "icon": "Grid3X3"
+    },
+    {
+      "id": "export",
+      "name": "Export & Share",
+      "description": "Multiple formats and quality options for your creations",
+      "icon": "Download"
+    },
+    {
+      "id": "collaboration",
+      "name": "Collaboration",
+      "description": "Work together and share your creative process",
+      "icon": "Users"
+    }
+  ],
+  "features": [
+    {
+      "id": "text-prompts",
+      "name": "Natural Language Prompts",
+      "shortDescription": "Describe what you want in plain English",
+      "description": "Use natural language to describe your desired image transformations. Our AI understands your creative vision and brings it to life.",
+      "status": "current",
+      "category": "ai-transformations",
+      "icon": "MessageSquare",
+      "deepLink": "/editor?focus=prompt",
+      "highlights": [
+        "Understand complex descriptions",
+        "Context-aware transformations",
+        "Multiple style combinations",
+        "Real-time preview"
+      ]
+    },
+    {
+      "id": "reference-images",
+      "name": "Reference Image Support",
+      "shortDescription": "Use multiple images as style references",
+      "description": "Upload reference images to guide the AI transformation. Combine styles from multiple sources for unique results.",
+      "status": "current",
+      "category": "ai-transformations",
+      "icon": "Layers",
+      "deepLink": "/editor?focus=reference",
+      "highlights": [
+        "Multiple reference uploads",
+        "Style transfer capabilities",
+        "Blend multiple influences",
+        "Precise control over influence"
+      ]
+    },
+    {
+      "id": "ai-generation",
+      "name": "AI Image Generation",
+      "shortDescription": "Create stunning images from scratch",
+      "description": "Generate completely new images using Google Gemini and Nano Banana AI services with advanced prompt engineering.",
+      "status": "current",
+      "category": "ai-transformations",
+      "icon": "Sparkles",
+      "deepLink": "/editor",
+      "highlights": [
+        "Multiple AI models",
+        "High-resolution output",
+        "Fast generation times",
+        "Iterative refinement"
+      ]
+    },
+    {
+      "id": "image-adjustments",
+      "name": "Professional Adjustments",
+      "shortDescription": "Fine-tune brightness, contrast, and more",
+      "description": "Comprehensive image adjustment tools including brightness, contrast, saturation, hue, and exposure controls.",
+      "status": "current",
+      "category": "editing-tools",
+      "icon": "SlidersHorizontal",
+      "deepLink": "/editor?focus=adjustments",
+      "highlights": [
+        "Real-time adjustments",
+        "Precise control sliders",
+        "Non-destructive editing",
+        "Undo/redo support"
+      ]
+    },
+    {
+      "id": "filters-effects",
+      "name": "Filters & Effects",
+      "shortDescription": "Apply creative filters instantly",
+      "description": "Choose from a variety of professional filters and effects to enhance your images with a single click.",
+      "status": "current",
+      "category": "editing-tools",
+      "icon": "Filter",
+      "deepLink": "/editor?focus=filters",
+      "highlights": [
+        "20+ built-in filters",
+        "Vintage to modern styles",
+        "Adjustable intensity",
+        "Layer effects"
+      ]
+    },
+    {
+      "id": "aspect-ratio",
+      "name": "Aspect Ratio Control",
+      "shortDescription": "Optimize for any platform",
+      "description": "Easily adjust aspect ratios for different social media platforms and use cases with smart cropping.",
+      "status": "current",
+      "category": "editing-tools",
+      "icon": "Crop",
+      "deepLink": "/editor?focus=export",
+      "highlights": [
+        "Social media presets",
+        "Custom ratios",
+        "Smart content-aware cropping",
+        "Multiple output sizes"
+      ]
+    },
+    {
+      "id": "rotation-transform",
+      "name": "Rotation & Transform",
+      "shortDescription": "Rotate and flip with precision",
+      "description": "Rotate images to any angle, flip horizontally or vertically, and apply geometric transformations.",
+      "status": "current",
+      "category": "editing-tools",
+      "icon": "RotateCw",
+      "deepLink": "/editor?focus=adjustments",
+      "highlights": [
+        "90-degree quick rotations",
+        "Custom angle rotation",
+        "Flip and mirror",
+        "Maintain quality"
+      ]
+    },
+    {
+      "id": "template-library",
+      "name": "Template Library",
+      "shortDescription": "20+ creative templates ready to use",
+      "description": "Explore our curated collection of templates for portraits, scenes, artistic styles, and more.",
+      "status": "current",
+      "category": "templates",
+      "icon": "Grid3X3",
+      "deepLink": "/templates",
+      "highlights": [
+        "20+ professional templates",
+        "Categorized library",
+        "One-click application",
+        "Regular updates"
+      ]
+    },
+    {
+      "id": "high-quality-export",
+      "name": "High-Quality Export",
+      "shortDescription": "Download in multiple formats",
+      "description": "Export your creations in various formats (PNG, JPG, WebP) with quality control and size optimization.",
+      "status": "current",
+      "category": "export",
+      "icon": "Download",
+      "deepLink": "/editor?focus=export",
+      "highlights": [
+        "Multiple format support",
+        "Quality control",
+        "File size optimization",
+        "Batch export"
+      ]
+    },
+    {
+      "id": "user-auth",
+      "name": "User Authentication",
+      "shortDescription": "Secure login with Supabase",
+      "description": "Sign up and log in securely to save your work and access it from anywhere.",
+      "status": "current",
+      "category": "collaboration",
+      "icon": "Lock",
+      "deepLink": "/auth/signup",
+      "highlights": [
+        "Secure authentication",
+        "Email verification",
+        "Password recovery",
+        "OAuth support (coming)"
+      ]
+    },
+    {
+      "id": "batch-processing",
+      "name": "Batch Processing",
+      "shortDescription": "Process multiple images at once",
+      "description": "Apply the same transformations, filters, and adjustments to multiple images simultaneously.",
+      "status": "coming-soon",
+      "category": "ai-transformations",
+      "icon": "FolderOpen",
+      "deepLink": "/roadmap#batch-processing",
+      "highlights": [
+        "Multi-image upload",
+        "Uniform transformations",
+        "Progress tracking",
+        "Batch export"
+      ]
+    },
+    {
+      "id": "inpainting",
+      "name": "AI Inpainting",
+      "shortDescription": "Remove or replace objects intelligently",
+      "description": "Select areas to remove, replace, or modify with AI-powered inpainting technology.",
+      "status": "coming-soon",
+      "category": "ai-transformations",
+      "icon": "Eraser",
+      "deepLink": "/roadmap#inpainting",
+      "highlights": [
+        "Object removal",
+        "Smart fill",
+        "Context-aware generation",
+        "Precise selection tools"
+      ]
+    },
+    {
+      "id": "background-removal",
+      "name": "Background Removal",
+      "shortDescription": "Remove backgrounds automatically",
+      "description": "Automatically detect and remove backgrounds with AI, perfect for product photos and portraits.",
+      "status": "coming-soon",
+      "category": "editing-tools",
+      "icon": "Scissors",
+      "deepLink": "/roadmap#background-removal",
+      "highlights": [
+        "One-click removal",
+        "Hair and edge refinement",
+        "Custom background",
+        "Transparent PNG export"
+      ]
+    },
+    {
+      "id": "layer-system",
+      "name": "Layer System",
+      "shortDescription": "Non-destructive layer-based editing",
+      "description": "Work with multiple layers for complex compositions and non-destructive editing workflows.",
+      "status": "coming-soon",
+      "category": "editing-tools",
+      "icon": "Layers",
+      "deepLink": "/roadmap#layers",
+      "highlights": [
+        "Unlimited layers",
+        "Blend modes",
+        "Layer opacity",
+        "Group management"
+      ]
+    },
+    {
+      "id": "custom-filters",
+      "name": "Custom Filter Creation",
+      "shortDescription": "Create and save your own filters",
+      "description": "Design custom filters by combining adjustments and save them for reuse across projects.",
+      "status": "coming-soon",
+      "category": "editing-tools",
+      "icon": "Brush",
+      "deepLink": "/roadmap#custom-filters",
+      "highlights": [
+        "Filter designer",
+        "Save presets",
+        "Share with community",
+        "Import/export"
+      ]
+    },
+    {
+      "id": "template-designer",
+      "name": "Template Designer",
+      "shortDescription": "Create and publish your own templates",
+      "description": "Design custom templates with the template editor and share them with the community.",
+      "status": "coming-soon",
+      "category": "templates",
+      "icon": "Paintbrush",
+      "deepLink": "/roadmap#template-designer",
+      "highlights": [
+        "Visual template editor",
+        "Parameter customization",
+        "Community sharing",
+        "Monetization options"
+      ]
+    },
+    {
+      "id": "cloud-storage",
+      "name": "Cloud Storage",
+      "shortDescription": "Store your projects in the cloud",
+      "description": "Save your work to the cloud and access it from any device with automatic syncing.",
+      "status": "coming-soon",
+      "category": "collaboration",
+      "icon": "Cloud",
+      "deepLink": "/roadmap#cloud-storage",
+      "highlights": [
+        "Auto-save",
+        "Version history",
+        "Cross-device sync",
+        "Generous storage limits"
+      ]
+    },
+    {
+      "id": "team-collaboration",
+      "name": "Team Collaboration",
+      "shortDescription": "Work together in real-time",
+      "description": "Invite team members to collaborate on projects with real-time editing and commenting.",
+      "status": "coming-soon",
+      "category": "collaboration",
+      "icon": "Users",
+      "deepLink": "/roadmap#collaboration",
+      "highlights": [
+        "Real-time co-editing",
+        "Comments and feedback",
+        "Permission management",
+        "Activity history"
+      ]
+    },
+    {
+      "id": "social-sharing",
+      "name": "Direct Social Sharing",
+      "shortDescription": "Share directly to social platforms",
+      "description": "Export and share your creations directly to Instagram, Twitter, Facebook, and more.",
+      "status": "coming-soon",
+      "category": "export",
+      "icon": "Share2",
+      "deepLink": "/roadmap#social-sharing",
+      "highlights": [
+        "One-click sharing",
+        "Platform optimization",
+        "Caption templates",
+        "Analytics tracking"
+      ]
+    },
+    {
+      "id": "api-access",
+      "name": "API Access",
+      "shortDescription": "Integrate with your applications",
+      "description": "Use our powerful API to integrate TAP[IMAGINE] capabilities into your own applications.",
+      "status": "coming-soon",
+      "category": "export",
+      "icon": "Code",
+      "deepLink": "/roadmap#api",
+      "highlights": [
+        "RESTful API",
+        "Comprehensive docs",
+        "Rate limiting tiers",
+        "Webhook support"
+      ]
+    }
+  ]
+}

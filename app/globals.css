@@ -103,11 +103,12 @@
 .slider-control::-webkit-slider-thumb {
   @apply appearance-none w-4 h-4 rounded-full bg-banana border-none;
 }
-/* Add this to app/globals.css */
-@keyframes slide-up {
+
+/* Animations for features page */
+@keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(1rem);
+    transform: translateY(2rem);
   }
   to {
     opacity: 1;
@@ -115,6 +116,44 @@
   }
 }
 
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s ease-out forwards;
+}
+
+/* Hover effects for feature cards */
+.feature-card-hover {
+  transition: all 0.3s ease;
+}
+
+.feature-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }

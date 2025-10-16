@@ -44,6 +44,7 @@ export default function Navbar() {
   // Navigation items
   const navItems = [
     { name: 'Home', href: '/', icon: <Home className="h-5 w-5" /> },
+    { name: 'Features', href: '/features', icon: <Settings className="h-5 w-5" /> },
     { name: 'Editor', href: '/editor', icon: <ImageIcon className="h-5 w-5" /> },
     { name: 'Templates', href: '/templates', icon: <Grid className="h-5 w-5" /> },
   ];
