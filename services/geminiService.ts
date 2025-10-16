@@ -1,15 +1,16 @@
 import { GoogleGenAI, Modality, GenerateContentResponse, Part } from "@google/genai";
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const API_KEY = process.env.API_KEY || '';
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
 export const editImage = async (
     images: { base64: string, mimeType: string }[], 
     prompt: string
 ): Promise<Part[]> => {
+    if (!ai) {
+        throw new Error("API_KEY environment variable is not set. Please configure your Google AI API key.");
+    }
+
     const model = 'gemini-2.5-flash-image-preview';
 
     const imageParts = images.map(image => ({
@@ -45,10 +46,10 @@ export const editImage = async (
                     .map(rating => rating.category)
                     .join(', ');
                 if (blockedCategories) {
-                    throw new Error(`Request blocked due to safety settings for: ${blockedCategories}.`);
+                    throw new Error(`Request blocked due to safety settings for: ${blockedCategories}. Please try a different prompt.`);
                 }
             }
-            throw new Error("No content parts received from the AI. The prompt might be too complex or unsafe.");
+            throw new Error("No content parts received from the AI. The request may have been filtered or the prompt might be too complex. Please try a simpler prompt.");
         }
     } catch (error) {
         console.error("Error calling Gemini API:", error);

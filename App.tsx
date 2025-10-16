@@ -117,7 +117,7 @@ const App: React.FC = () => {
           isImageUploaded={!!primaryImage}
           adjustments={adjustments}
           setAdjustments={setAdjustments}
-          editedImageUrl={editedContent?.imageData}
+          editedImageUrl={editedContent?.imageData ?? null}
         />
         <main className="flex-1 container mx-auto p-4 md:p-8 overflow-y-auto">
           {error && <Alert message={error} onClose={() => setError(null)} />}

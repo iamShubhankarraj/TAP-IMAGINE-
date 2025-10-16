@@ -3,7 +3,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { useImageStore } from '@/context/image-store';
-import { ZoomIn, ZoomOut, Move, MaximizeSquare, Loader2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Move, Maximize2, Loader2 } from 'lucide-react';
 
 type EditorCanvasProps = {
   isProcessing?: boolean;
@@ -180,7 +180,7 @@ export default function EditorCanvas({
             className="p-2 text-white/80 hover:text-white rounded-md hover:bg-white/10 transition-colors"
             title="Reset zoom"
           >
-            <MaximizeSquare size={18} />
+            <Maximize2 size={18} />
           </button>
         </div>
       )}

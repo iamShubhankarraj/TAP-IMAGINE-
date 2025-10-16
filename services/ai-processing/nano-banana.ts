@@ -40,12 +40,13 @@ export async function generateImageWithNanoBanana(
   payload: NanoBananaRequestPayload
 ): Promise<NanoBananaResponse> {
   const API_KEY = process.env.GOOGLE_NANO_BANANA_API_KEY;
-  
-  if (!API_KEY) {
-    throw new Error('Google Nano Banana API key not found');
-  }
+  const USE_SIMULATION = process.env.NODE_ENV === 'development' || !API_KEY;
   
   try {
+    if (USE_SIMULATION) {
+      return await simulateApiResponse(payload);
+    }
+    
     // Prepare the request headers
     const headers = {
       'Content-Type': 'application/json',
@@ -55,9 +56,6 @@ export async function generateImageWithNanoBanana(
     // In a real implementation, this would be the actual API endpoint
     const API_ENDPOINT = 'https://api.nanobanana.google.ai/v1/generate';
     
-    // For development/testing purposes, we'll simulate the API call
-    // In production, uncomment this code and use actual API
-    /*
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers,
@@ -65,24 +63,38 @@ export async function generateImageWithNanoBanana(
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({ message: 'Failed to process image' }));
       throw new Error(errorData.message || 'Failed to process image');
     }
     
-    return await response.json();
-    */
+    const result = await response.json();
     
-    // Simulated API response for development
-    // This will be replaced with real API calls in production
-    return await simulateApiResponse(payload);
+    if (!result.generatedImage) {
+      throw new Error('No content received from the AI. The image might not have been generated successfully.');
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error generating image with Nano Banana:', error);
     
     // Provide a user-friendly error message
     if (error instanceof Error) {
-      throw new Error(`Image processing failed: ${error.message}`);
+      const errorMessage = error.message.includes('fetch') 
+        ? 'Unable to connect to the AI service. Please check your internet connection.'
+        : error.message;
+      return {
+        status: 'error',
+        message: errorMessage,
+        generatedImage: '',
+        processingTime: 0
+      };
     } else {
-      throw new Error('Image processing failed for unknown reasons');
+      return {
+        status: 'error',
+        message: 'Image processing failed for unknown reasons',
+        generatedImage: '',
+        processingTime: 0
+      };
     }
   }
 }
@@ -92,6 +104,25 @@ export async function generateImageWithNanoBanana(
  * This function will be removed in production
  */
 async function simulateApiResponse(payload: NanoBananaRequestPayload): Promise<NanoBananaResponse> {
+  // Validate input
+  if (!payload.primaryImage) {
+    return {
+      status: 'error',
+      message: 'No primary image provided',
+      generatedImage: '',
+      processingTime: 0
+    };
+  }
+  
+  if (!payload.prompt || payload.prompt.trim().length === 0) {
+    return {
+      status: 'error',
+      message: 'No prompt provided',
+      generatedImage: '',
+      processingTime: 0
+    };
+  }
+  
   // Simulate processing time
   await new Promise(resolve => setTimeout(resolve, 3000));
   
@@ -101,6 +132,7 @@ async function simulateApiResponse(payload: NanoBananaRequestPayload): Promise<N
     generatedImage: payload.primaryImage, // Just return the input image for now
     processingTime: 2.5,
     status: 'success',
+    message: 'Image processed successfully',
     metadata: {
       promptAnalysis: `Applied transformation based on: "${payload.prompt}"`,
       styleUsed: extractStyleFromPrompt(payload.prompt),
