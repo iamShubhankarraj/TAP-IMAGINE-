@@ -2,8 +2,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useImageStore } from '@/context/image-store';
+import { useAuth } from '@/context/auth-context';
 import { generateImageWithNanoBanana } from '@/services/ai-processing/nano-banana';
+import { createImageSession } from '@/lib/supabase/image-sessions';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { 
@@ -41,6 +44,8 @@ const funnyLoadingMessages = [
 ];
 
 export default function EditorPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const { primaryImage, referenceImages, generatedImage, setPrimaryImage, setGeneratedImage } = useImageStore();
   const [activeTab, setActiveTab] = useState<EditorTab>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -55,6 +60,7 @@ export default function EditorPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isProcessing) {
@@ -115,12 +121,18 @@ export default function EditorPage() {
       });
 
       if (result.status === 'success' && result.generatedImage) {
-        setGeneratedImage({
+        const generatedImg = {
           id: uuidv4(),
           url: result.generatedImage,
           name: `edited-${primaryImage.name}`,
           createdAt: new Date(),
-        });
+        };
+        
+        setGeneratedImage(generatedImg);
+        
+        if (user) {
+          await saveSessionToSupabase(inputPrompt, generatedImg.url);
+        }
       } else {
         const errorMessage = result.message || 'Failed to generate image. Please try again.';
         alert(`Error: ${errorMessage}`);
@@ -134,6 +146,42 @@ export default function EditorPage() {
       alert(`Failed to process image: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const saveSessionToSupabase = async (usedPrompt: string, generatedUrl: string) => {
+    if (!primaryImage || !user) return;
+
+    try {
+      const { data, error } = await createImageSession({
+        original_image_url: primaryImage.url,
+        original_image_name: primaryImage.name,
+        generated_image_url: generatedUrl,
+        generated_image_name: `edited-${primaryImage.name}`,
+        reference_images: referenceImages.map(img => ({ url: img.url, name: img.name })),
+        prompt: usedPrompt,
+        aspect_ratio: aspectRatio,
+        adjustments,
+        metadata: {
+          created_in_editor: true,
+          timestamp: new Date().toISOString(),
+        },
+        session_name: `Session ${new Date().toLocaleDateString()}`,
+      });
+
+      if (data) {
+        setCurrentSessionId(data.id);
+      }
+    } catch (error) {
+      console.error('Error saving session to Supabase:', error);
+    }
+  };
+
+  const handleViewResults = () => {
+    if (currentSessionId) {
+      router.push(`/results/${currentSessionId}`);
+    } else {
+      alert('Please generate an image first or sign in to save your session');
     }
   };
 
@@ -489,6 +537,15 @@ export default function EditorPage() {
                       <Share2 className="h-6 w-6" />
                     </button>
                   </div>
+                  {user && currentSessionId && (
+                    <button
+                      onClick={handleViewResults}
+                      className="absolute bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-banana text-gray-900 font-medium rounded-lg hover:bg-banana-light transition-colors shadow-xl flex items-center gap-2"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      View Results & Continue Editing
+                    </button>
+                  )}
                 </div>
               ) : primaryImage ? (
                 <img 

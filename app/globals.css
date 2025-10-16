@@ -83,25 +83,41 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
 /* Custom classes for TAP[IMAGINE] */
 .editor-canvas {
-  @apply border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 min-h-[400px] flex items-center justify-center relative overflow-hidden;
+  border: 2px dashed #d1d5db;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .slider-control {
-  @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+  width: 100%;
+  height: 0.5rem;
+  background-color: #e5e7eb;
+  border-radius: 0.5rem;
+  appearance: none;
+  cursor: pointer;
 }
 
 .slider-control::-webkit-slider-thumb {
-  @apply appearance-none w-4 h-4 rounded-full bg-banana border-none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background-color: #fbbf24;
+  border: none;
 }
 /* Add this to app/globals.css */
 @keyframes slide-up {
