@@ -3,11 +3,17 @@
 const nextConfig = {
     reactStrictMode: true,
     images: {
-      domains: ['localhost', 'your-supabase-project.supabase.co'],
+      remotePatterns: [
+        {
+          protocol: 'http',
+          hostname: 'localhost',
+        },
+        {
+          protocol: 'https',
+          hostname: '*.supabase.co',
+        },
+      ],
       formats: ['image/avif', 'image/webp'],
-    },
-    experimental: {
-      serverActions: true,
     },
   }
   

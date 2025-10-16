@@ -140,7 +140,7 @@ export default function HomePage() {
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              See What's Possible
+              See What&apos;s Possible
             </h2>
             <p className="text-xl text-white/70 max-w-3xl mx-auto">
               From subtle enhancements to complete transformations, the possibilities are endless.
