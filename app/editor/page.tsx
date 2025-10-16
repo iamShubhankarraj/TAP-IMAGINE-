@@ -12,6 +12,8 @@ import {
   SlidersHorizontal, Undo, Redo, Save, Share2, Palette,
   Maximize2, Loader2
 } from 'lucide-react';
+import ExportModal from '@/components/editor/export/ExportModal';
+import { ImageAdjustments } from '@/types/export';
 
 type EditorTab = 'upload' | 'prompt' | 'templates' | 'adjust';
 type AspectRatioOption = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'original';
@@ -51,10 +53,13 @@ export default function EditorPage() {
     saturation: 0,
     sharpness: 0,
   });
+  const [rotation, setRotation] = useState(0);
+  const [filter, setFilter] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   useEffect(() => {
     if (isProcessing) {
@@ -139,6 +144,19 @@ export default function EditorPage() {
 
   const handleAdjustmentChange = (name: string, value: number) => {
     setAdjustments(prev => ({ ...prev, [name]: value }));
+  };
+
+  const getExportAdjustments = (): ImageAdjustments => ({
+    brightness: adjustments.brightness || 0,
+    contrast: adjustments.contrast || 0,
+    saturation: adjustments.saturation || 0,
+    sharpness: adjustments.sharpness || 0,
+    rotation: rotation,
+    filter: filter,
+  });
+
+  const handleExportClick = () => {
+    setIsExportModalOpen(true);
   };
 
   return (
@@ -304,11 +322,12 @@ export default function EditorPage() {
                     </div>
                     
                     <button 
+                      onClick={handleExportClick}
                       className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-banana text-gray-900 font-medium rounded-lg hover:bg-banana-light transition-colors disabled:opacity-50"
                       disabled={!generatedImage}
                     >
                       <Download className="h-5 w-5" />
-                      Download Image
+                      Export Image
                     </button>
                   </div>
                 </div>
@@ -482,8 +501,11 @@ export default function EditorPage() {
                     className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 rounded-lg">
-                    <button className="p-3 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors">
-                      <Download className="h-6 w-6" />
+                    <button
+                     onClick={handleExportClick}
+                     className="p-3 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors"
+                    >
+                     <Download className="h-6 w-6" />
                     </button>
                     <button className="p-3 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors">
                       <Share2 className="h-6 w-6" />
@@ -514,6 +536,14 @@ export default function EditorPage() {
           </div>
         </main>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        imageUrl={generatedImage?.url || null}
+        adjustments={getExportAdjustments()}
+      />
     </div>
   );
 }
