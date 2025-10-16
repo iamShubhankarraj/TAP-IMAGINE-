@@ -1,12 +1,13 @@
 // app/auth/signup/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { X, Mail, ChevronDown, Check } from 'lucide-react';
 import Image from 'next/image';
+import { trackPageView, trackSignUp } from '@/lib/analytics';
 
 // Country data for phone dropdown
 const countries = [
@@ -33,6 +34,10 @@ export default function SignupPage() {
   const { signUp } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    trackPageView('/auth/signup');
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -41,6 +46,7 @@ export default function SignupPage() {
     try {
       // In a real implementation, you would also send firstName, lastName, and phone to your backend
       await signUp(email, password);
+      trackSignUp('email');
       setSuccess(true);
     } catch (error: any) {
       setError(error.message || 'Failed to sign up. Please try again.');

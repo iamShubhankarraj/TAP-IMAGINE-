@@ -1,11 +1,12 @@
 // app/auth/login/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { X, Mail, Lock, CheckCircle } from 'lucide-react';
+import { trackPageView, trackLogin } from '@/lib/analytics';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,10 @@ export default function LoginPage() {
   const { signIn } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    trackPageView('/auth/login');
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -24,6 +29,7 @@ export default function LoginPage() {
     
     try {
       await signIn(email, password);
+      trackLogin('email');
       router.push('/dashboard');
     } catch (error: any) {
       setError('Invalid email or password. Please try again.');

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ExportModal from '@/components/editor/export/ExportModal';
 import { ImageAdjustments } from '@/types/export';
+import { trackPageView, trackFeature } from '@/lib/analytics';
 
 type EditorTab = 'upload' | 'prompt' | 'templates' | 'adjust';
 type AspectRatioOption = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'original';
@@ -60,6 +61,10 @@ export default function EditorPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  useEffect(() => {
+    trackPageView('/editor');
+  }, []);
 
   useEffect(() => {
     if (isProcessing) {
@@ -126,6 +131,7 @@ export default function EditorPage() {
           name: `edited-${primaryImage.name}`,
           createdAt: new Date(),
         });
+        trackFeature('image_generation', { prompt: inputPrompt, aspectRatio });
       } else {
         const errorMessage = result.message || 'Failed to generate image. Please try again.';
         alert(`Error: ${errorMessage}`);
