@@ -114,7 +114,7 @@ export default function EditorPage() {
         aspectRatio: aspectRatio === 'original' ? undefined : aspectRatio,
       });
 
-      if (result.status === 'success') {
+      if (result.status === 'success' && result.generatedImage) {
         setGeneratedImage({
           id: uuidv4(),
           url: result.generatedImage,
@@ -122,11 +122,16 @@ export default function EditorPage() {
           createdAt: new Date(),
         });
       } else {
-        alert(`Error: ${result.message || 'Failed to generate image'}`);
+        const errorMessage = result.message || 'Failed to generate image. Please try again.';
+        alert(`Error: ${errorMessage}`);
+        console.error('Image generation failed:', result);
       }
     } catch (error) {
       console.error('Error processing image:', error);
-      alert('Failed to process image. Please try again.');
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unexpected error occurred while processing your image.';
+      alert(`Failed to process image: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
