@@ -1,0 +1,49 @@
+{
+  "comparisons": [
+    {
+      "id": "portrait-enhancement",
+      "title": "Portrait Enhancement",
+      "description": "Transform portraits with AI-powered enhancements",
+      "category": "ai-transformations",
+      "beforeLabel": "Original",
+      "afterLabel": "AI Enhanced",
+      "prompt": "Professional studio portrait with soft lighting"
+    },
+    {
+      "id": "artistic-style",
+      "title": "Artistic Style Transfer",
+      "description": "Apply artistic styles to your photos",
+      "category": "ai-transformations",
+      "beforeLabel": "Photo",
+      "afterLabel": "Oil Painting Style",
+      "prompt": "Transform into impressionist oil painting style"
+    },
+    {
+      "id": "landscape-enhancement",
+      "title": "Landscape Enhancement",
+      "description": "Enhance landscapes with vibrant colors and details",
+      "category": "editing-tools",
+      "beforeLabel": "Original",
+      "afterLabel": "Enhanced",
+      "prompt": "Vibrant sunset with enhanced colors and clarity"
+    },
+    {
+      "id": "vintage-filter",
+      "title": "Vintage Film Effect",
+      "description": "Apply authentic vintage film aesthetics",
+      "category": "templates",
+      "beforeLabel": "Modern",
+      "afterLabel": "Vintage Film",
+      "prompt": "1970s vintage film look with warm tones"
+    },
+    {
+      "id": "fantasy-transformation",
+      "title": "Fantasy Scene",
+      "description": "Transform ordinary scenes into fantasy worlds",
+      "category": "ai-transformations",
+      "beforeLabel": "Regular Photo",
+      "afterLabel": "Fantasy World",
+      "prompt": "Magical fantasy scene with ethereal lighting"
+    }
+  ]
+}

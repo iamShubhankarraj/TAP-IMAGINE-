@@ -34,8 +34,8 @@ export default function HomePage() {
                 Start Creating
                 <ArrowRight className="h-5 w-5" />
               </Link>
-              <Link href="/templates" className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-medium rounded-full hover:bg-white/20 transition-colors flex items-center justify-center gap-2">
-                Explore Templates
+              <Link href="/features" className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-medium rounded-full hover:bg-white/20 transition-colors flex items-center justify-center gap-2">
+                Explore Features
               </Link>
             </div>
           </div>
@@ -170,9 +170,13 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="text-center mt-12">
+          <div className="text-center mt-12 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/editor" className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-medium rounded-full hover:bg-white/20 transition-colors inline-flex items-center gap-2">
               Create Your Own
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link href="/features" className="px-8 py-4 bg-white/10 backdrop-blur-md text-white font-medium rounded-full hover:bg-white/20 transition-colors inline-flex items-center gap-2">
+              View All Features
               <ArrowRight className="h-5 w-5" />
             </Link>
           </div>
