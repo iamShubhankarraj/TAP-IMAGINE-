@@ -1,0 +1,184 @@
+{
+    "templates": [
+      {
+        "id": "child",
+        "name": "You as a Child",
+        "description": "Transform into your younger self",
+        "prompt": "Transform this person to look like they did as a child, age 5-8 years old, innocent expression, playful, bright eyes, soft features",
+        "category": "portrait",
+        "thumbnail": "/templates/child.jpg",
+        "tags": ["portrait", "age", "transformation"]
+      },
+      {
+        "id": "80s",
+        "name": "80s Retro",
+        "description": "Classic 80s aesthetic",
+        "prompt": "Transform with vibrant 80s aesthetic: neon colors, retro style, vintage film grain, nostalgic vibes, bold fashion, classic 1980s look",
+        "category": "style",
+        "thumbnail": "/templates/80s.jpg",
+        "tags": ["retro", "vintage", "80s"]
+      },
+      {
+        "id": "cyberpunk",
+        "name": "Cyberpunk",
+        "description": "Futuristic neon cityscape",
+        "prompt": "Transform into cyberpunk style: neon lights, futuristic, dark atmospheric, tech noir, blade runner aesthetic, glowing circuits, dystopian future",
+        "category": "style",
+        "thumbnail": "/templates/cyberpunk.jpg",
+        "tags": ["futuristic", "neon", "sci-fi"]
+      },
+      {
+        "id": "watercolor",
+        "name": "Watercolor Art",
+        "description": "Soft watercolor painting",
+        "prompt": "Transform into beautiful watercolor painting: soft edges, flowing colors, artistic, hand-painted texture, paper grain, delicate washes",
+        "category": "artistic",
+        "thumbnail": "/templates/watercolor.jpg",
+        "tags": ["painting", "artistic", "soft"]
+      },
+      {
+        "id": "anime",
+        "name": "Anime Style",
+        "description": "Japanese animation style",
+        "prompt": "Transform into anime art style: cel-shaded, vibrant colors, expressive large eyes, manga aesthetic, clean linework, Japanese animation",
+        "category": "artistic",
+        "thumbnail": "/templates/anime.jpg",
+        "tags": ["anime", "manga", "japanese"]
+      },
+      {
+        "id": "superhero",
+        "name": "Superhero",
+        "description": "Epic superhero transformation",
+        "prompt": "Transform into superhero: powerful heroic pose, dramatic lighting, epic atmosphere, comic book style, cape flowing, heroic proportions",
+        "category": "fun",
+        "thumbnail": "/templates/superhero.jpg",
+        "tags": ["superhero", "comic", "epic"]
+      },
+      {
+        "id": "vintage",
+        "name": "Vintage Film",
+        "description": "Old photograph aesthetic",
+        "prompt": "Transform into vintage photograph: sepia tones, film grain, faded colors, nostalgic 1950s aesthetic, classic photography, timeless",
+        "category": "style",
+        "thumbnail": "/templates/vintage.jpg",
+        "tags": ["vintage", "retro", "film"]
+      },
+      {
+        "id": "oil-painting",
+        "name": "Oil Painting",
+        "description": "Classical oil painting",
+        "prompt": "Transform into classical oil painting: rich textures, painterly visible brushstrokes, renaissance style, museum quality, classical art masterpiece",
+        "category": "artistic",
+        "thumbnail": "/templates/oil-painting.jpg",
+        "tags": ["painting", "classical", "art"]
+      },
+      {
+        "id": "noir",
+        "name": "Film Noir",
+        "description": "Black and white dramatic",
+        "prompt": "Transform into film noir style: high contrast black and white, dramatic hard shadows, 1940s detective movie aesthetic, mystery, moody",
+        "category": "style",
+        "thumbnail": "/templates/noir.jpg",
+        "tags": ["black-white", "noir", "dramatic"]
+      },
+      {
+        "id": "fantasy",
+        "name": "Fantasy Portrait",
+        "description": "Magical fantasy realm",
+        "prompt": "Transform into fantasy portrait: magical atmosphere, ethereal lighting, mythical, elvish features, enchanted, mystical aura, fantasy realm",
+        "category": "fantasy",
+        "thumbnail": "/templates/fantasy.jpg",
+        "tags": ["fantasy", "magical", "ethereal"]
+      },
+      {
+        "id": "pixel-art",
+        "name": "Pixel Art",
+        "description": "8-bit retro gaming",
+        "prompt": "Transform into pixel art: 8-bit style, retro gaming aesthetic, limited color palette, crisp square pixels, nostalgic video game look",
+        "category": "artistic",
+        "thumbnail": "/templates/pixel-art.jpg",
+        "tags": ["pixel", "retro", "gaming"]
+      },
+      {
+        "id": "sketch",
+        "name": "Pencil Sketch",
+        "description": "Hand-drawn sketch",
+        "prompt": "Transform into detailed pencil sketch: crosshatching, graphite texture, artistic hand-drawn, charcoal shading, realistic sketch",
+        "category": "artistic",
+        "thumbnail": "/templates/sketch.jpg",
+        "tags": ["sketch", "drawing", "pencil"]
+      },
+      {
+        "id": "pop-art",
+        "name": "Pop Art",
+        "description": "Warhol-style pop art",
+        "prompt": "Transform into pop art: bold vibrant colors, high contrast, halftone dots, Andy Warhol style, screen print aesthetic, iconic pop culture",
+        "category": "artistic",
+        "thumbnail": "/templates/pop-art.jpg",
+        "tags": ["pop-art", "warhol", "bold"]
+      },
+      {
+        "id": "zombie",
+        "name": "Zombie",
+        "description": "Undead transformation",
+        "prompt": "Transform into zombie: realistic decaying skin, horror makeup, undead features, spooky dark atmosphere, walking dead aesthetic",
+        "category": "fun",
+        "thumbnail": "/templates/zombie.jpg",
+        "tags": ["zombie", "horror", "halloween"]
+      },
+      {
+        "id": "medieval",
+        "name": "Medieval Portrait",
+        "description": "Historical painting",
+        "prompt": "Transform into medieval portrait: renaissance painting style, historical period clothing, classical composition, oil painting technique, regal",
+        "category": "historical",
+        "thumbnail": "/templates/medieval.jpg",
+        "tags": ["medieval", "historical", "renaissance"]
+      },
+      {
+        "id": "neon",
+        "name": "Neon Glow",
+        "description": "Vibrant neon effects",
+        "prompt": "Add vibrant neon glow effects: bright neon colors, electric atmosphere, glowing edges, illuminated, nighttime vibrancy",
+        "category": "effects",
+        "thumbnail": "/templates/neon.jpg",
+        "tags": ["neon", "glow", "vibrant"]
+      },
+      {
+        "id": "cartoon",
+        "name": "Cartoon",
+        "description": "Animated cartoon style",
+        "prompt": "Transform into cartoon character: simplified features, bold black outlines, bright flat colors, animated style, fun and playful",
+        "category": "fun",
+        "thumbnail": "/templates/cartoon.jpg",
+        "tags": ["cartoon", "animated", "fun"]
+      },
+      {
+        "id": "gothic",
+        "name": "Gothic",
+        "description": "Dark gothic aesthetic",
+        "prompt": "Transform into gothic style: dark moody atmosphere, dramatic, Victorian gothic fashion, mysterious, elegant darkness",
+        "category": "style",
+        "thumbnail": "/templates/gothic.jpg",
+        "tags": ["gothic", "dark", "victorian"]
+      },
+      {
+        "id": "space",
+        "name": "Cosmic",
+        "description": "Space-themed transformation",
+        "prompt": "Transform with cosmic space theme: swirling galaxies, colorful nebulas, stars, cosmic colors, space atmosphere, celestial",
+        "category": "fantasy",
+        "thumbnail": "/templates/space.jpg",
+        "tags": ["space", "cosmic", "galaxy"]
+      },
+      {
+        "id": "steampunk",
+        "name": "Steampunk",
+        "description": "Victorian sci-fi",
+        "prompt": "Transform into steampunk style: Victorian era fashion, brass gears, mechanical elements, industrial aesthetic, vintage technology",
+        "category": "style",
+        "thumbnail": "/templates/steampunk.jpg",
+        "tags": ["steampunk", "victorian", "mechanical"]
+      }
+    ]
+  }

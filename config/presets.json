@@ -1,0 +1,224 @@
+{
+    "presets": [
+      {
+        "id": "teal-amber-cinema",
+        "name": "Teal & Amber Cinema",
+        "description": "Cinematic teal and orange color grade",
+        "category": "cinema",
+        "adjustments": {
+          "temperature": 5,
+          "contrast": 10,
+          "highlights": -25,
+          "shadows": 25,
+          "saturation": 5,
+          "clarity": 5,
+          "dehaze": 5,
+          "grain": 10,
+          "vignette": -10
+        }
+      },
+      {
+        "id": "matte-mocha",
+        "name": "Matte Mocha",
+        "description": "Soft matte finish with warm tones",
+        "category": "lifestyle",
+        "adjustments": {
+          "exposure": 1,
+          "contrast": -10,
+          "highlights": -30,
+          "shadows": 30,
+          "blacks": 10,
+          "saturation": -10,
+          "texture": -10,
+          "grain": 25,
+          "vignette": -15
+        }
+      },
+      {
+        "id": "clean-product-pop",
+        "name": "Clean Product Pop",
+        "description": "Crisp and clean for product photography",
+        "category": "product",
+        "adjustments": {
+          "contrast": 20,
+          "whites": 15,
+          "blacks": -10,
+          "clarity": 10,
+          "texture": 10,
+          "sharpness": 15,
+          "saturation": 5
+        }
+      },
+      {
+        "id": "golden-hour-lift",
+        "name": "Golden Hour Lift",
+        "description": "Warm, lifted shadows for backlit portraits",
+        "category": "portrait",
+        "adjustments": {
+          "temperature": 15,
+          "highlights": -40,
+          "shadows": 35,
+          "saturation": 10,
+          "vibrance": 15,
+          "grain": 8,
+          "vignette": -10
+        }
+      },
+      {
+        "id": "foggy-pastel",
+        "name": "Foggy Pastel",
+        "description": "Dreamy pastel tones with low contrast",
+        "category": "artistic",
+        "adjustments": {
+          "contrast": -20,
+          "dehaze": -20,
+          "saturation": -15,
+          "vibrance": -10,
+          "texture": -10,
+          "clarity": -10
+        }
+      },
+      {
+        "id": "noir-crunch",
+        "name": "Noir Crunch",
+        "description": "High contrast black and white",
+        "category": "vintage",
+        "adjustments": {
+          "contrast": 35,
+          "highlights": -20,
+          "shadows": 20,
+          "clarity": 15,
+          "grain": 30,
+          "sharpness": 20,
+          "saturation": -100
+        }
+      },
+      {
+        "id": "desert-bronze",
+        "name": "Desert Bronze",
+        "description": "Warm desert tones",
+        "category": "landscape",
+        "adjustments": {
+          "temperature": 10,
+          "tint": 10,
+          "saturation": 15,
+          "texture": 5,
+          "clarity": 5,
+          "vignette": -12
+        }
+      },
+      {
+        "id": "deep-forest-green",
+        "name": "Deep Forest Green",
+        "description": "Rich green tones for nature",
+        "category": "landscape",
+        "adjustments": {
+          "highlights": -30,
+          "shadows": 20,
+          "vibrance": 15,
+          "dehaze": 10,
+          "texture": 5
+        }
+      },
+      {
+        "id": "neon-nightlife",
+        "name": "Neon Nightlife",
+        "description": "Vibrant neon colors for night scenes",
+        "category": "cinema",
+        "adjustments": {
+          "exposure": -3,
+          "contrast": 20,
+          "saturation": 25,
+          "vibrance": 20,
+          "dehaze": 8,
+          "clarity": 10
+        }
+      },
+      {
+        "id": "soft-skin-portrait",
+        "name": "Soft Skin Portrait",
+        "description": "Flattering skin tones",
+        "category": "portrait",
+        "adjustments": {
+          "contrast": -10,
+          "highlights": -10,
+          "texture": -25,
+          "clarity": -10,
+          "vibrance": 5,
+          "vignette": -8
+        }
+      },
+      {
+        "id": "coastal-film-wash",
+        "name": "Coastal Film Wash",
+        "description": "Faded film look for beach scenes",
+        "category": "lifestyle",
+        "adjustments": {
+          "temperature": -5,
+          "tint": 3,
+          "blacks": 15,
+          "saturation": -10,
+          "grain": 20
+        }
+      },
+      {
+        "id": "urban-grit",
+        "name": "Urban Grit",
+        "description": "Gritty street photography look",
+        "category": "cinema",
+        "adjustments": {
+          "contrast": 25,
+          "blacks": -15,
+          "dehaze": 10,
+          "clarity": 15,
+          "texture": 10,
+          "grain": 15,
+          "vignette": -10
+        }
+      },
+      {
+        "id": "pastel-portrait-pop",
+        "name": "Pastel Portrait Pop",
+        "description": "Soft pastel tones for portraits",
+        "category": "portrait",
+        "adjustments": {
+          "contrast": -10,
+          "shadows": 25,
+          "saturation": -10,
+          "vibrance": 5,
+          "texture": -5,
+          "grain": 12
+        }
+      },
+      {
+        "id": "high-key-minimal",
+        "name": "High-Key Minimal",
+        "description": "Bright and airy",
+        "category": "product",
+        "adjustments": {
+          "exposure": 5,
+          "contrast": -15,
+          "highlights": 10,
+          "shadows": 35,
+          "blacks": 10,
+          "saturation": -15,
+          "clarity": -5
+        }
+      },
+      {
+        "id": "cyber-magenta",
+        "name": "Cyber Magenta",
+        "description": "Futuristic magenta and cyan",
+        "category": "cinema",
+        "adjustments": {
+          "exposure": -2,
+          "contrast": 15,
+          "saturation": 30,
+          "dehaze": 6,
+          "clarity": 8,
+          "vignette": -12,
+          "grain": 5
+        }
+      }
+    ]
+  }

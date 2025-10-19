@@ -21,12 +21,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.className} bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800`}>
         <AuthProvider>
           <ImageStoreProvider>
             <ExportQueueProvider>
               <Navbar />
-              <main className="container mx-auto px-4 py-8">
+              <main className="min-h-screen">
                 {children}
               </main>
             </ExportQueueProvider>

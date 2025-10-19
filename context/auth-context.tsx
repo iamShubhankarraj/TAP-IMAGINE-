@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user profile from Supabase
+  // Fetch user profile from Supabase (non-blocking - app works without profiles table)
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -49,13 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (error) {
-        console.error('Error fetching profile:', error);
+        // Profiles table doesn't exist or no row for user - this is OK
+        // The app will work fine without profile data
+        console.log('Profile not found (this is OK):', error.message);
         return null;
       }
       
       return data as ProfileData;
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // Silently fail - profile is optional
       return null;
     }
   };
@@ -141,15 +143,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log('🔐 Auth context: Starting login for', email);
       
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
+      if (error) {
+        console.error('❌ Auth context: Login error:', error);
+      } else {
+        console.log('✅ Auth context: Login successful, session:', data.session ? 'Created' : 'None');
+      }
+      
       return { error };
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('❌ Auth context: Sign in exception:', error);
       return { error: error as Error };
     } finally {
       setIsLoading(false);

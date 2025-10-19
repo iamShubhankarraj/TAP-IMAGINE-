@@ -1,191 +1,146 @@
 // app/editor/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useImageStore } from '@/context/image-store';
-import { generateImageWithNanoBanana } from '@/services/ai-processing/nano-banana';
-import { v4 as uuidv4 } from 'uuid';
+import { useState } from 'react';
 import Link from 'next/link';
 import { 
   Upload, Sparkles, Sliders, Download, Image as ImageIcon, 
-  Grid, Wand2, RotateCw, ChevronLeft, ChevronRight, Layers,
-  SlidersHorizontal, Undo, Redo, Save, Share2, Palette,
-  Maximize2, Loader2
+  Grid, ChevronLeft, ChevronRight, Undo, Redo, Save, Share2, 
+  Maximize2, Camera
 } from 'lucide-react';
+import { StoredImage } from '@/types/editor';
+import { TemplateData } from '@/types/templates';
+import { ImageAdjustments, defaultAdjustments } from '@/types/adjustments';
+import { generateImageWithGemini } from '@/services/geminiService';
+import { v4 as uuidv4 } from 'uuid';
+
+// Components
+import ImageUploader from '@/components/editor/upload/ImageUploader';
+import PromptInput from '@/components/editor/ai-prompt/PromptInput';
+import TemplatesGrid from '@/components/editor/templates/TemplatesGrid';
+import AdjustmentControls from '@/components/editor/adjustments/AdjustmentControls';
+import FiltersPanel from '@/components/editor/filters/FiltersPanel';
+import ImageComparison from '@/components/editor/canvas/ImageComparison';
 import ExportModal from '@/components/editor/export/ExportModal';
-import { ImageAdjustments } from '@/types/export';
+import FunnyLoading from '@/components/animations/FunnyLoading';
+import Alert from '@/components/shared/Alert';
 
-type EditorTab = 'upload' | 'prompt' | 'templates' | 'adjust';
-type AspectRatioOption = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'original';
-
-// Example templates
-const templates = [
-  { id: 1, name: 'You as a child', thumbnail: '/templates/child.jpg' },
-  { id: 2, name: '80s Retro', thumbnail: '/templates/80s.jpg' },
-  { id: 3, name: 'Cyberpunk', thumbnail: '/templates/cyberpunk.jpg' },
-  { id: 4, name: 'Watercolor', thumbnail: '/templates/watercolor.jpg' },
-  { id: 5, name: 'Anime Style', thumbnail: '/templates/anime.jpg' },
-  { id: 6, name: 'Superhero', thumbnail: '/templates/superhero.jpg' },
-];
-
-// Funny loading messages
-const funnyLoadingMessages = [
-  "Teaching monkeys to use Photoshop...",
-  "Polishing pixels to perfection...",
-  "Consulting with Leonardo da Vinci...",
-  "Negotiating with the color palette...",
-  "Feeding the hamsters that power our servers...",
-  "Making your photo look bananas!",
-  "Convincing AI not to add laser eyes...",
-  "Searching for the perfect filter in a parallel universe...",
-  "Converting caffeine into creative code...",
-  "Whispering sweet nothings to the algorithm..."
-];
+type EditorTab = 'upload' | 'prompt' | 'templates' | 'adjust' | 'filters';
 
 export default function EditorPage() {
-  const { primaryImage, referenceImages, generatedImage, setPrimaryImage, setGeneratedImage } = useImageStore();
+  // State
+  const [primaryImage, setPrimaryImage] = useState<StoredImage | null>(null);
+  const [referenceImages, setReferenceImages] = useState<StoredImage[]>([]);
+  const [generatedImage, setGeneratedImage] = useState<StoredImage | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [adjustments, setAdjustments] = useState<Record<string, number>>({
-    brightness: 0,
-    contrast: 0,
-    saturation: 0,
-    sharpness: 0,
-  });
-  const [rotation, setRotation] = useState(0);
-  const [filter, setFilter] = useState<string | null>(null);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
+  const [adjustments, setAdjustments] = useState<ImageAdjustments>(defaultAdjustments);
+  const [currentFilter, setCurrentFilter] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
-  const [fullscreen, setFullscreen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isProcessing) {
-      const interval = setInterval(() => {
-        const randomMessage = funnyLoadingMessages[Math.floor(Math.random() * funnyLoadingMessages.length)];
-        setLoadingMessage(randomMessage);
-      }, 3000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [isProcessing]);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setPrimaryImage({
-        id: uuidv4(),
-        url: base64,
-        name: file.name,
-        createdAt: new Date(),
-      });
-    };
-    reader.readAsDataURL(file);
+  // Handlers
+  const handlePrimaryImageUpload = (image: StoredImage) => {
+    setPrimaryImage(image);
+    setActiveTab('prompt');
   };
 
-  const handlePromptSubmit = () => {
-    if (!prompt.trim() || !primaryImage) return;
-    processImage(prompt);
+  const handleReferenceImageUpload = (image: StoredImage) => {
+    setReferenceImages(prev => [...prev, image]);
   };
 
-  const handleTemplateSelect = (templateName: string) => {
-    const templatePrompt = `Transform this image in the style of ${templateName}`;
-    setPrompt(templatePrompt);
-    processImage(templatePrompt);
-  };
-
-  const processImage = async (inputPrompt: string) => {
+  const handleTemplateSelect = async (template: TemplateData) => {
     if (!primaryImage) {
-      alert('Please upload an image first');
+      setError('Please upload an image first');
       return;
     }
 
+    setPrompt(template.prompt);
+    await processImage(template.prompt);
+  };
+
+  const handlePromptSubmit = async () => {
+    if (!prompt.trim() || !primaryImage) {
+      setError('Please upload an image and enter a prompt');
+      return;
+    }
+    await processImage(prompt);
+  };
+
+  const processImage = async (inputPrompt: string) => {
+    if (!primaryImage) return;
+
     setIsProcessing(true);
-    setLoadingMessage(funnyLoadingMessages[Math.floor(Math.random() * funnyLoadingMessages.length)]);
+    setError(null);
 
     try {
-      const referenceImageBase64 = referenceImages.map(img => img.url);
-      
-      const result = await generateImageWithNanoBanana({
+      const result = await generateImageWithGemini({
         primaryImage: primaryImage.url,
-        referenceImages: referenceImageBase64,
+        referenceImages: referenceImages.map(img => img.url),
         prompt: inputPrompt,
-        aspectRatio: aspectRatio === 'original' ? undefined : aspectRatio,
       });
 
-      if (result.status === 'success' && result.generatedImage) {
+      if (result.success && result.generatedImage) {
         setGeneratedImage({
           id: uuidv4(),
           url: result.generatedImage,
           name: `edited-${primaryImage.name}`,
           createdAt: new Date(),
         });
+        setActiveTab('adjust');
       } else {
-        const errorMessage = result.message || 'Failed to generate image. Please try again.';
-        alert(`Error: ${errorMessage}`);
-        console.error('Image generation failed:', result);
+        setError(result.error || 'Failed to generate image');
       }
-    } catch (error) {
-      console.error('Error processing image:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'An unexpected error occurred while processing your image.';
-      alert(`Failed to process image: ${errorMessage}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleAdjustmentChange = (name: string, value: number) => {
-    setAdjustments(prev => ({ ...prev, [name]: value }));
-  };
-
-  const getExportAdjustments = (): ImageAdjustments => ({
-    brightness: adjustments.brightness || 0,
-    contrast: adjustments.contrast || 0,
-    saturation: adjustments.saturation || 0,
-    sharpness: adjustments.sharpness || 0,
-    rotation: rotation,
-    filter: filter,
-  });
-
-  const handleExportClick = () => {
+  const handleExport = () => {
+    if (!generatedImage && !primaryImage) {
+      setError('No image to export');
+      return;
+    }
     setIsExportModalOpen(true);
   };
 
+  const displayImage = generatedImage || primaryImage;
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white">
-      {/* Header with logo and actions */}
-      <header className="h-16 border-b border-white/10 backdrop-blur-md bg-black/20 flex items-center justify-between px-4 md:px-6">
-        <Link href="/" className="text-2xl font-bold flex items-center">
+      {/* Loading Overlay */}
+      {isProcessing && <FunnyLoading />}
+
+      {/* Header */}
+      <header className="h-16 border-b border-white/10 backdrop-blur-md bg-black/20 flex items-center justify-between px-4 md:px-6 z-10">
+        <Link href="/" className="text-2xl font-bold flex items-center hover:opacity-80 transition-opacity">
           <span className="text-banana">TAP</span>
           <span className="text-white">[IMAGINE]</span>
         </Link>
         
-        <div className="flex items-center space-x-4">
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors">
+        <div className="flex items-center space-x-2">
+          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Undo">
             <Undo className="h-5 w-5" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Redo">
             <Redo className="h-5 w-5" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Save">
             <Save className="h-5 w-5" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Share">
             <Share2 className="h-5 w-5" />
           </button>
           <button 
-            onClick={() => setFullscreen(!fullscreen)}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            onClick={handleExport}
+            className="ml-2 px-4 py-2 bg-banana hover:bg-banana-light text-gray-900 font-medium rounded-lg transition-colors flex items-center gap-2"
           >
-            <Maximize2 className="h-5 w-5" />
+            <Download className="h-5 w-5" />
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </header>
@@ -194,13 +149,13 @@ export default function EditorPage() {
         {/* Sidebar */}
         <aside 
           className={`${
-            isSidebarCollapsed ? 'w-16' : 'w-64 md:w-80'
-          } border-r border-white/10 backdrop-blur-md bg-black/20 flex flex-col transition-all duration-300 overflow-hidden`}
+            isSidebarCollapsed ? 'w-0' : 'w-80 lg:w-96'
+          } border-r border-white/10 backdrop-blur-md bg-black/20 flex flex-col transition-all duration-300 overflow-hidden relative`}
         >
-          {/* Sidebar toggle */}
+          {/* Sidebar Toggle */}
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute top-20 left-0 ml-3 p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-colors z-10"
+            className="absolute -right-3 top-20 z-20 p-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-colors"
           >
             {isSidebarCollapsed ? 
               <ChevronRight className="h-4 w-4" /> : 
@@ -209,330 +164,127 @@ export default function EditorPage() {
           </button>
           
           {/* Tabs */}
-          <div className="flex border-b border-white/10">
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`flex items-center justify-center py-4 flex-1 ${activeTab === 'upload' ? 'bg-white/10' : 'hover:bg-white/5'} transition-colors`}
-            >
-              {isSidebarCollapsed ? (
-                <Upload className="h-5 w-5" />
-              ) : (
-                <>
-                  <Upload className="h-5 w-5 mr-2" />
-                  <span>Upload</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('prompt')}
-              className={`flex items-center justify-center py-4 flex-1 ${activeTab === 'prompt' ? 'bg-white/10' : 'hover:bg-white/5'} transition-colors`}
-            >
-              {isSidebarCollapsed ? (
-                <Sparkles className="h-5 w-5" />
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5 mr-2" />
-                  <span>Prompt</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('templates')}
-              className={`flex items-center justify-center py-4 flex-1 ${activeTab === 'templates' ? 'bg-white/10' : 'hover:bg-white/5'} transition-colors`}
-            >
-              {isSidebarCollapsed ? (
-                <Grid className="h-5 w-5" />
-              ) : (
-                <>
-                  <Grid className="h-5 w-5 mr-2" />
-                  <span>Templates</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('adjust')}
-              className={`flex items-center justify-center py-4 flex-1 ${activeTab === 'adjust' ? 'bg-white/10' : 'hover:bg-white/5'} transition-colors`}
-            >
-              {isSidebarCollapsed ? (
-                <Sliders className="h-5 w-5" />
-              ) : (
-                <>
-                  <Sliders className="h-5 w-5 mr-2" />
-                  <span>Adjust</span>
-                </>
-              )}
-            </button>
+          <div className="flex border-b border-white/10 overflow-x-auto">
+            {[
+              { id: 'upload' as EditorTab, icon: Upload, label: 'Upload' },
+              { id: 'prompt' as EditorTab, icon: Sparkles, label: 'Prompt' },
+              { id: 'templates' as EditorTab, icon: Grid, label: 'Templates' },
+              { id: 'adjust' as EditorTab, icon: Sliders, label: 'Adjust' },
+              { id: 'filters' as EditorTab, icon: ImageIcon, label: 'Filters' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center justify-center py-3 px-4 flex-1 min-w-0 ${
+                  activeTab === tab.id ? 'bg-white/10 border-b-2 border-banana' : 'hover:bg-white/5'
+                } transition-colors`}
+              >
+                <tab.icon className="h-5 w-5 mr-2 flex-shrink-0" />
+                <span className="text-sm truncate">{tab.label}</span>
+              </button>
+            ))}
           </div>
           
-          {/* Tab content */}
-          <div className={`flex-1 p-4 ${isSidebarCollapsed ? 'hidden' : 'overflow-y-auto'}`}>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+
             {activeTab === 'upload' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Upload Image</h3>
-                <div 
-                  className="border-2 border-dashed border-white/30 rounded-lg p-8 text-center cursor-pointer hover:border-banana transition-colors"
-                  onClick={() => document.getElementById('imageUpload')?.click()}
-                >
-                  <Upload className="h-10 w-10 mx-auto text-white/50 mb-3" />
-                  <p className="text-white/70">Drag & drop or click to upload</p>
-                  <p className="text-white/50 text-sm mt-1">PNG, JPG, GIF up to 10MB</p>
-                  <input 
-                    type="file" 
-                    id="imageUpload" 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                  />
-                </div>
+              <div className="space-y-6">
+                <ImageUploader 
+                  onImageUpload={handlePrimaryImageUpload}
+                  title="Primary Image"
+                />
                 
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium mb-3">Reference Images</h3>
-                  <div 
-                    className="border-2 border-dashed border-white/30 rounded-lg p-4 text-center cursor-pointer hover:border-banana transition-colors"
-                    onClick={() => document.getElementById('referenceImageUpload')?.click()}
-                  >
-                    <p className="text-white/70 text-sm">Add reference images (optional)</p>
-                    <input 
-                      type="file" 
-                      id="referenceImageUpload" 
-                      className="hidden" 
-                      accept="image/*" 
-                      multiple 
+                {primaryImage && (
+                  <div className="pt-6 border-t border-white/10">
+                    <ImageUploader 
+                      onImageUpload={handleReferenceImageUpload}
+                      title="Reference Images (Optional)"
+                      multiple
                     />
-                  </div>
-                </div>
-                
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium mb-3">Export Options</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-white/70 text-sm mb-1">Aspect Ratio</label>
-                      <select
-                        value={aspectRatio}
-                        onChange={(e) => setAspectRatio(e.target.value as AspectRatioOption)}
-                        className="w-full bg-white/5 border border-white/20 rounded-lg p-2 text-white focus:outline-none focus:border-banana"
-                      >
-                        <option value="original">Original</option>
-                        <option value="1:1">1:1 (Square)</option>
-                        <option value="16:9">16:9 (Landscape)</option>
-                        <option value="9:16">9:16 (Portrait)</option>
-                        <option value="4:3">4:3 (Classic)</option>
-                        <option value="3:4">3:4 (Portrait)</option>
-                      </select>
-                    </div>
                     
-                    <button 
-                      onClick={handleExportClick}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-banana text-gray-900 font-medium rounded-lg hover:bg-banana-light transition-colors disabled:opacity-50"
-                      disabled={!generatedImage}
-                    >
-                      <Download className="h-5 w-5" />
-                      Export Image
-                    </button>
+                    {referenceImages.length > 0 && (
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {referenceImages.map((img, i) => (
+                          <div key={img.id} className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                            <img src={img.url} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             )}
             
             {activeTab === 'prompt' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">AI Prompt</h3>
-                <div className="relative">
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe how you want to transform your image..."
-                    className="w-full p-3 h-32 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-banana resize-none"
-                  />
-                </div>
-                
-                <button 
-                  onClick={handlePromptSubmit}
-                  disabled={!prompt.trim() || !primaryImage || isProcessing}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-banana text-gray-900 font-medium rounded-lg hover:bg-banana-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-5 w-5" />
-                      Generate Image
-                    </>
-                  )}
-                </button>
-                
-                <div className="mt-6">
-                  <h3 className="text-md font-medium flex items-center gap-2 mb-3">
-                    <Sparkles className="h-4 w-4 text-banana" />
-                    Try these prompts
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "Make it look like an oil painting",
-                      "Add cyberpunk neon elements",
-                      "Convert to watercolor style",
-                      "Add dramatic lighting",
-                      "Make it look vintage"
-                    ].map((example, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setPrompt(example)}
-                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-sm transition-colors"
-                      >
-                        {example}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <PromptInput
+                value={prompt}
+                onChange={setPrompt}
+                onSubmit={handlePromptSubmit}
+                isProcessing={isProcessing}
+                disabled={!primaryImage}
+              />
             )}
             
             {activeTab === 'templates' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Templates</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {templates.map(template => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleTemplateSelect(template.name)}
-                      className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:border-banana transition-all group"
-                    >
-                      <div className="aspect-square bg-white/10 flex items-center justify-center">
-                        {/* In a real app, show actual template thumbnails */}
-                        <span className="text-white/70">{template.name}</span>
-                      </div>
-                      <div className="p-2 text-left">
-                        <h4 className="text-sm font-medium truncate group-hover:text-banana transition-colors">{template.name}</h4>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                
-                <button
-                  onClick={() => handleTemplateSelect("Surprise Me!")}
-                  className="w-full mt-4 py-3 px-4 bg-white/10 hover:bg-white/15 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="h-5 w-5 text-banana" />
-                  Surprise Me!
-                </button>
-              </div>
+              <TemplatesGrid
+                onTemplateSelect={handleTemplateSelect}
+                userImage={primaryImage?.url}
+              />
             )}
             
             {activeTab === 'adjust' && (
-              <div className="space-y-5">
-                <h3 className="text-lg font-medium flex items-center gap-2">
-                  <SlidersHorizontal className="h-5 w-5 text-banana" />
-                  Adjustments
-                </h3>
-                
-                {[
-                  { name: 'brightness', label: 'Brightness', min: -100, max: 100 },
-                  { name: 'contrast', label: 'Contrast', min: -100, max: 100 },
-                  { name: 'saturation', label: 'Saturation', min: -100, max: 100 },
-                  { name: 'sharpness', label: 'Sharpness', min: 0, max: 100 }
-                ].map(adj => (
-                  <div key={adj.name} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm text-white/80">{adj.label}</label>
-                      <span className="text-xs text-white/60">{adjustments[adj.name]}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={adj.min}
-                      max={adj.max}
-                      value={adjustments[adj.name]}
-                      onChange={(e) => handleAdjustmentChange(adj.name, parseInt(e.target.value))}
-                      className="w-full accent-banana bg-white/10 h-2 rounded-full appearance-none"
-                    />
-                  </div>
-                ))}
-                
-                <div className="pt-4">
-                  <h3 className="text-md font-medium mb-3">Filters</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Vintage', 'B&W', 'Sepia', 'Cool', 'Warm', 'Film'].map((filter, i) => (
-                      <button
-                        key={i}
-                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-center transition-colors"
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="pt-4 flex justify-center gap-4">
-                  <button className="p-2 bg-white/10 hover:bg-white/15 rounded-full transition-colors">
-                    <RotateCw className="h-5 w-5" />
-                  </button>
-                  <button className="p-2 bg-white/10 hover:bg-white/15 rounded-full transition-colors">
-                    <Palette className="h-5 w-5" />
-                  </button>
-                  <button className="p-2 bg-white/10 hover:bg-white/15 rounded-full transition-colors">
-                    <Layers className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
+              <AdjustmentControls
+                adjustments={adjustments}
+                onChange={setAdjustments}
+              />
+            )}
+            
+            {activeTab === 'filters' && (
+              <FiltersPanel
+                currentFilter={currentFilter}
+                onFilterChange={setCurrentFilter}
+                previewImage={displayImage?.url}
+              />
             )}
           </div>
         </aside>
         
-        {/* Main canvas area */}
+        {/* Main Canvas */}
         <main className="flex-1 overflow-hidden relative">
-          {/* Canvas background with grid pattern */}
-          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>
+          {/* Grid Background */}
+          <div className="absolute inset-0 opacity-5" style={{
+            backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+            backgroundSize: '20px 20px'
+          }}></div>
           
-          {/* Canvas content */}
+          {/* Canvas Content */}
           <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="relative max-w-full max-h-full">
-              {isProcessing ? (
-                <div className="backdrop-blur-md bg-black/30 rounded-xl p-8 border border-white/10 shadow-2xl">
-                  <Loader2 className="h-16 w-16 animate-spin mx-auto text-banana mb-4" />
-                  <p className="text-center text-white/80 text-lg">{loadingMessage}</p>
-                </div>
-              ) : generatedImage ? (
-                <div className="relative group">
-                  <img 
-                    src={generatedImage.url} 
-                    alt="Generated"
-                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 rounded-lg">
-                    <button
-                     onClick={handleExportClick}
-                     className="p-3 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors"
-                    >
-                     <Download className="h-6 w-6" />
-                    </button>
-                    <button className="p-3 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors">
-                      <Share2 className="h-6 w-6" />
-                    </button>
-                  </div>
-                </div>
-              ) : primaryImage ? (
-                <img 
-                  src={primaryImage.url} 
-                  alt="Original"
-                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xl"
-                />
-              ) : (
-                <div className="backdrop-blur-md bg-black/30 rounded-xl p-8 border border-white/10 shadow-2xl text-center">
-                  <ImageIcon className="h-16 w-16 text-white/30 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-white mb-2">No Image Selected</h3>
-                  <p className="text-white/60 mb-6">Upload an image to get started with editing</p>
+            {displayImage ? (
+              <ImageComparison
+                originalUrl={primaryImage?.url || ''}
+                editedUrl={generatedImage?.url}
+                adjustments={adjustments}
+                filter={currentFilter || undefined}
+              />
+            ) : (
+              <div className="text-center">
+                <div className="backdrop-blur-md bg-black/30 rounded-2xl p-12 border border-white/10 shadow-2xl max-w-md">
+                  <Camera className="h-20 w-20 text-white/30 mx-auto mb-6" />
+                  <h3 className="text-2xl font-medium text-white mb-3">No Image Selected</h3>
+                  <p className="text-white/60 mb-8">Upload an image to start creating amazing transformations</p>
                   <button 
                     onClick={() => setActiveTab('upload')}
-                    className="px-6 py-3 bg-banana text-gray-900 font-medium rounded-lg hover:bg-banana-light transition-colors inline-flex items-center gap-2"
+                    className="px-8 py-4 bg-banana hover:bg-banana-light text-gray-900 font-medium rounded-xl transition-all hover:scale-105 inline-flex items-center gap-2"
                   >
                     <Upload className="h-5 w-5" />
                     Upload Image
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -541,8 +293,8 @@ export default function EditorPage() {
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        imageUrl={generatedImage?.url || null}
-        adjustments={getExportAdjustments()}
+        imageUrl={displayImage?.url || null}
+        adjustments={adjustments}
       />
     </div>
   );

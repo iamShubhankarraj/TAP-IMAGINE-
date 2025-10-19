@@ -1,206 +1,151 @@
 // components/editor/adjustments/AdjustmentControls.tsx
 'use client';
 
-import { useState } from 'react';
-import { 
-  SunMedium, Moon, Contrast, Droplet, Maximize, 
-  RotateCcw, RotateCw, RefreshCw, Palette, Grid3X3 
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { ImageAdjustments, defaultAdjustments, Preset } from '@/types/adjustments';
+import CoreAdjustments from './CoreAdjustments';
+import DetailPanel from './DetailPanel';
+import HSLPanel from './HSLPanel';
+import ColorAdjustments from './ColorAdjustments';
+import PresetsPanel from './PresetsPanel';
+import { RotateCw, FlipHorizontal, FlipVertical, RefreshCw } from 'lucide-react';
 
-type AdjustmentType = {
-  name: string;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-  icon: React.ReactNode;
-};
+interface AdjustmentControlsProps {
+  adjustments: ImageAdjustments;
+  onChange: (adjustments: ImageAdjustments) => void;
+}
 
-type Filter = {
-  name: string;
-  label: string;
-};
+type AdjustmentTab = 'presets' | 'core' | 'color' | 'hsl' | 'detail';
 
-type AdjustmentControlsProps = {
-  onAdjustmentChange: (adjustments: Record<string, number>) => void;
-  onFilterChange?: (filter: string | null) => void;
-  onRotate?: (degrees: number) => void;
-  disabled?: boolean;
-};
+export default function AdjustmentControls({ adjustments, onChange }: AdjustmentControlsProps) {
+  const [activeTab, setActiveTab] = useState<AdjustmentTab>('presets');
+  const [currentPresetId, setCurrentPresetId] = useState<string | null>(null);
 
-// Define all available adjustments
-const adjustments: AdjustmentType[] = [
-  { name: 'brightness', label: 'Brightness', min: -100, max: 100, step: 1, defaultValue: 0, icon: <SunMedium className="h-5 w-5" /> },
-  { name: 'contrast', label: 'Contrast', min: -100, max: 100, step: 1, defaultValue: 0, icon: <Contrast className="h-5 w-5" /> },
-  { name: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, defaultValue: 0, icon: <Droplet className="h-5 w-5" /> },
-  { name: 'sharpness', label: 'Sharpness', min: 0, max: 100, step: 1, defaultValue: 0, icon: <Maximize className="h-5 w-5" /> },
-];
-
-// Define all available filters
-const filters: Filter[] = [
-  { name: 'none', label: 'None' },
-  { name: 'vintage', label: 'Vintage' },
-  { name: 'bw', label: 'B&W' },
-  { name: 'sepia', label: 'Sepia' },
-  { name: 'cool', label: 'Cool' },
-  { name: 'warm', label: 'Warm' },
-  { name: 'film', label: 'Film' },
-];
-
-export default function AdjustmentControls({ 
-  onAdjustmentChange, 
-  onFilterChange,
-  onRotate,
-  disabled = false 
-}: AdjustmentControlsProps) {
-  const [values, setValues] = useState<Record<string, number>>(() => {
-    const initialValues: Record<string, number> = {};
-    adjustments.forEach((adj) => {
-      initialValues[adj.name] = adj.defaultValue;
-    });
-    return initialValues;
-  });
-  
-  const [rotation, setRotation] = useState<number>(0);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
-
-  const handleChange = (name: string, value: number) => {
-    const newValues = { ...values, [name]: value };
-    setValues(newValues);
-    onAdjustmentChange(newValues);
+  const handlePartialChange = (partial: Partial<ImageAdjustments>) => {
+    onChange({ ...adjustments, ...partial });
   };
 
-  const handleRotate = (direction: 'left' | 'right') => {
-    const newRotation = direction === 'left' 
-      ? (rotation - 90) % 360 
-      : (rotation + 90) % 360;
-      
-    setRotation(newRotation);
-    
-    if (onRotate) {
-      onRotate(newRotation);
-    }
-  };
-  
-  const handleFilterChange = (filterName: string) => {
-    const newFilter = activeFilter === filterName ? null : filterName;
-    setActiveFilter(newFilter);
-    
-    if (onFilterChange) {
-      onFilterChange(newFilter);
-    }
+  const handlePresetApply = (preset: Preset) => {
+    onChange({ ...adjustments, ...preset.adjustments });
+    setCurrentPresetId(preset.id);
   };
 
-  const resetAdjustments = () => {
-    const defaultValues: Record<string, number> = {};
-    adjustments.forEach((adj) => {
-      defaultValues[adj.name] = adj.defaultValue;
-    });
-    
-    setValues(defaultValues);
-    setRotation(0);
-    setActiveFilter(null);
-    
-    onAdjustmentChange(defaultValues);
-    
-    if (onFilterChange) {
-      onFilterChange(null);
-    }
-    
-    if (onRotate) {
-      onRotate(0);
-    }
+  const handleReset = () => {
+    onChange(defaultAdjustments);
+    setCurrentPresetId(null);
   };
+
+  const handleRotate = () => {
+    const newRotation = (adjustments.rotation + 90) % 360;
+    handlePartialChange({ rotation: newRotation });
+  };
+
+  const handleFlipHorizontal = () => {
+    handlePartialChange({ flipHorizontal: !adjustments.flipHorizontal });
+  };
+
+  const handleFlipVertical = () => {
+    handlePartialChange({ flipVertical: !adjustments.flipVertical });
+  };
+
+  const tabs = [
+    { id: 'presets' as AdjustmentTab, label: 'Presets', icon: '✨' },
+    { id: 'core' as AdjustmentTab, label: 'Basic', icon: '☀️' },
+    { id: 'color' as AdjustmentTab, label: 'Color', icon: '🎨' },
+    { id: 'hsl' as AdjustmentTab, label: 'HSL', icon: '🌈' },
+    { id: 'detail' as AdjustmentTab, label: 'Detail', icon: '🔍' },
+  ];
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-white/90">Adjustments</h3>
+    <div className="space-y-4 h-full flex flex-col">
+      {/* Transform Controls */}
+      <div className="flex gap-2">
         <button
-          onClick={resetAdjustments}
-          disabled={disabled}
-          className="text-sm text-white/60 hover:text-white transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleRotate}
+          className="flex-1 p-2 bg-white/10 hover:bg-white/15 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+          title="Rotate 90°"
+        >
+          <RotateCw className="h-4 w-4" />
+        </button>
+        <button
+          onClick={handleFlipHorizontal}
+          className={`flex-1 p-2 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm ${
+            adjustments.flipHorizontal ? 'bg-banana text-gray-900' : 'bg-white/10 hover:bg-white/15'
+          }`}
+          title="Flip Horizontal"
+        >
+          <FlipHorizontal className="h-4 w-4" />
+        </button>
+        <button
+          onClick={handleFlipVertical}
+          className={`flex-1 p-2 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm ${
+            adjustments.flipVertical ? 'bg-banana text-gray-900' : 'bg-white/10 hover:bg-white/15'
+          }`}
+          title="Flip Vertical"
+        >
+          <FlipVertical className="h-4 w-4" />
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex-1 p-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+          title="Reset All"
         >
           <RefreshCw className="h-4 w-4" />
-          Reset
         </button>
       </div>
 
-      <div className="space-y-5">
-        {adjustments.map((adjustment) => (
-          <div key={adjustment.name} className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-                {adjustment.icon}
-                {adjustment.label}
-              </label>
-              <span className="text-xs text-white/60">{values[adjustment.name]}</span>
-            </div>
-            <input
-              type="range"
-              min={adjustment.min}
-              max={adjustment.max}
-              step={adjustment.step}
-              value={values[adjustment.name]}
-              onChange={(e) => handleChange(adjustment.name, parseInt(e.target.value))}
-              disabled={disabled}
-              className="w-full accent-banana bg-white/10 h-2 rounded-full appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-black/20 p-1 rounded-lg">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`
+              flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all
+              ${activeTab === tab.id
+                ? 'bg-banana text-gray-900 shadow-lg'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+              }
+            `}
+          >
+            <span className="mr-1">{tab.icon}</span>
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      <div className="pt-2">
-        <h3 className="text-md font-medium mb-3 text-white/90 flex items-center gap-2">
-          <Palette className="h-5 w-5 text-banana" />
-          Filters
-        </h3>
-        <div className="grid grid-cols-3 gap-2">
-          {filters.map((filter) => (
-            <button
-              key={filter.name}
-              onClick={() => handleFilterChange(filter.name)}
-              disabled={disabled}
-              className={`
-                p-2 rounded-lg text-sm text-center transition-colors
-                ${activeFilter === filter.name 
-                  ? 'bg-banana/20 text-banana border border-banana/30' 
-                  : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-transparent'}
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="pt-4 flex justify-center gap-6">
-        <button 
-          onClick={() => handleRotate('left')}
-          disabled={disabled}
-          className="p-2.5 bg-white/10 hover:bg-white/15 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Rotate left 90°"
-        >
-          <RotateCcw className="h-5 w-5 text-white/80" />
-        </button>
-        <button
-          onClick={() => handleRotate('right')}
-          disabled={disabled}
-          className="p-2.5 bg-white/10 hover:bg-white/15 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Rotate right 90°"
-        >
-          <RotateCw className="h-5 w-5 text-white/80" />
-        </button>
-        <button
-          onClick={resetAdjustments}
-          disabled={disabled}
-          className="p-2.5 bg-white/10 hover:bg-white/15 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Reset all adjustments"
-        >
-          <Grid3X3 className="h-5 w-5 text-white/80" />
-        </button>
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+        {activeTab === 'presets' && (
+          <PresetsPanel 
+            onApplyPreset={handlePresetApply}
+            currentPresetId={currentPresetId}
+          />
+        )}
+        {activeTab === 'core' && (
+          <CoreAdjustments 
+            adjustments={adjustments}
+            onChange={handlePartialChange}
+          />
+        )}
+        {activeTab === 'color' && (
+          <ColorAdjustments 
+            adjustments={adjustments}
+            onChange={handlePartialChange}
+          />
+        )}
+        {activeTab === 'hsl' && (
+          <HSLPanel 
+            adjustments={adjustments}
+            onChange={handlePartialChange}
+          />
+        )}
+        {activeTab === 'detail' && (
+          <DetailPanel 
+            adjustments={adjustments}
+            onChange={handlePartialChange}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,345 +1,207 @@
 // components/editor/export/ExportModal.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  X, Plus, Trash2, Download, Settings, Layers, Image as ImageIcon,
-  FileImage, Briefcase, Printer, Instagram, Smartphone, Save, Play
-} from 'lucide-react';
-import { ExportConfig, ExportPreset, ImageAdjustments } from '@/types/export';
-import { createDefaultExportConfig, DEFAULT_PRESETS } from '@/services/export-service';
-import { useExportQueue } from '@/context/export-queue-context';
-import ExportConfigEditor from './ExportConfigEditor';
-import ExportQueuePanel from './ExportQueuePanel';
+import React, { useState } from 'react';
+import { X, Download, Loader2 } from 'lucide-react';
+import { ImageAdjustments } from '@/types/adjustments';
+import { exportImage } from '@/lib/image-processing/export';
 
-type ExportModalProps = {
+interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   imageUrl: string | null;
   adjustments: ImageAdjustments;
-};
+}
 
-const PRESET_ICONS: Record<string, React.ReactNode> = {
-  Instagram: <Instagram className="h-5 w-5" />,
-  Smartphone: <Smartphone className="h-5 w-5" />,
-  Briefcase: <Briefcase className="h-5 w-5" />,
-  Printer: <Printer className="h-5 w-5" />,
-};
+type AspectRatioOption = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'original';
+type FormatOption = 'png' | 'jpeg' | 'webp';
 
-export default function ExportModal({ 
-  isOpen, 
-  onClose, 
-  imageUrl, 
-  adjustments 
-}: ExportModalProps) {
-  const [activeTab, setActiveTab] = useState<'presets' | 'custom' | 'queue'>('presets');
-  const [selectedPreset, setSelectedPreset] = useState<ExportPreset | null>(null);
-  const [customConfigs, setCustomConfigs] = useState<ExportConfig[]>([]);
-  const [editingConfig, setEditingConfig] = useState<ExportConfig | null>(null);
-  const { jobs, isProcessing, addJob, addJobs, startProcessing } = useExportQueue();
+export default function ExportModal({ isOpen, onClose, imageUrl, adjustments }: ExportModalProps) {
+  const [format, setFormat] = useState<FormatOption>('jpeg');
+  const [quality, setQuality] = useState(90);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
+  const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setActiveTab('presets');
-      setSelectedPreset(null);
-      setEditingConfig(null);
-    }
-  }, [isOpen]);
+  if (!isOpen || !imageUrl) return null;
 
-  const handlePresetSelect = (preset: ExportPreset) => {
-    if (!imageUrl) return;
-    setSelectedPreset(preset);
-  };
+  const handleExport = async () => {
+    setIsExporting(true);
+    
+    try {
+      const blob = await exportImage(imageUrl, adjustments, {
+        format,
+        quality: quality / 100,
+        aspectRatio: aspectRatio === 'original' ? undefined : aspectRatio,
+      });
 
-  const handleExportPreset = () => {
-    if (!imageUrl || !selectedPreset) return;
-    addJobs(selectedPreset.configs, imageUrl, adjustments);
-    setActiveTab('queue');
-  };
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tap-imagine-${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-  const handleAddCustomConfig = () => {
-    const newConfig = createDefaultExportConfig();
-    setCustomConfigs(prev => [...prev, newConfig]);
-    setEditingConfig(newConfig);
-  };
-
-  const handleUpdateConfig = (config: ExportConfig) => {
-    setCustomConfigs(prev => 
-      prev.map(c => c.id === config.id ? config : c)
-    );
-    setEditingConfig(null);
-  };
-
-  const handleDeleteConfig = (configId: string) => {
-    setCustomConfigs(prev => prev.filter(c => c.id !== configId));
-    if (editingConfig?.id === configId) {
-      setEditingConfig(null);
+      // Close modal after successful export
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export image. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const handleExportCustom = () => {
-    if (!imageUrl || customConfigs.length === 0) return;
-    addJobs(customConfigs, imageUrl, adjustments);
-    setActiveTab('queue');
-  };
+  const formatOptions = [
+    { value: 'jpeg' as FormatOption, label: 'JPEG', desc: 'Best for photos, smaller file size' },
+    { value: 'png' as FormatOption, label: 'PNG', desc: 'Lossless, supports transparency' },
+    { value: 'webp' as FormatOption, label: 'WebP', desc: 'Modern format, great quality' },
+  ];
 
-  const handleStartExport = async () => {
-    await startProcessing();
-  };
-
-  if (!isOpen) return null;
+  const aspectRatioOptions = [
+    { value: 'original' as AspectRatioOption, label: 'Original' },
+    { value: '1:1' as AspectRatioOption, label: '1:1 (Square)' },
+    { value: '16:9' as AspectRatioOption, label: '16:9 (Landscape)' },
+    { value: '9:16' as AspectRatioOption, label: '9:16 (Portrait)' },
+    { value: '4:3' as AspectRatioOption, label: '4:3 (Classic)' },
+    { value: '3:4' as AspectRatioOption, label: '3:4 (Portrait)' },
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-gradient-to-br from-gray-900 via-purple-900/50 to-violet-800/50 rounded-xl border border-white/10 shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-gradient-to-br from-gray-900 to-purple-900 rounded-2xl max-w-2xl w-full border border-white/10 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-banana/20 rounded-lg">
-              <Download className="h-6 w-6 text-banana" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white">Export Image</h2>
-              <p className="text-white/60 text-sm">Configure and export your image</p>
-            </div>
-          </div>
+          <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Download className="h-6 w-6 text-banana" />
+            Export Image
+          </h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 rounded-full hover:bg-white/10 transition-colors"
           >
-            <X className="h-6 w-6 text-white/70" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-white/10 bg-black/20">
-          <button
-            onClick={() => setActiveTab('presets')}
-            className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-              activeTab === 'presets'
-                ? 'border-banana text-white'
-                : 'border-transparent text-white/60 hover:text-white'
-            }`}
-          >
-            <Layers className="h-4 w-4" />
-            Presets
-          </button>
-          <button
-            onClick={() => setActiveTab('custom')}
-            className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-              activeTab === 'custom'
-                ? 'border-banana text-white'
-                : 'border-transparent text-white/60 hover:text-white'
-            }`}
-          >
-            <Settings className="h-4 w-4" />
-            Custom
-          </button>
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-              activeTab === 'queue'
-                ? 'border-banana text-white'
-                : 'border-transparent text-white/60 hover:text-white'
-            }`}
-          >
-            <FileImage className="h-4 w-4" />
-            Queue
-            {jobs.length > 0 && (
-              <span className="px-2 py-0.5 bg-banana text-gray-900 text-xs font-bold rounded-full">
-                {jobs.length}
-              </span>
-            )}
+            <X className="h-6 w-6 text-white" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {!imageUrl ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <ImageIcon className="h-16 w-16 text-white/30 mb-4" />
-              <p className="text-white/70 text-lg">No image available to export</p>
-              <p className="text-white/50 text-sm mt-2">Please generate or upload an image first</p>
+        <div className="p-6 space-y-6">
+          {/* Format Selection */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-white/90">Format</label>
+            <div className="grid grid-cols-3 gap-3">
+              {formatOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setFormat(opt.value)}
+                  className={`
+                    p-4 rounded-lg text-left transition-all
+                    ${format === opt.value
+                      ? 'bg-banana text-gray-900 ring-2 ring-banana shadow-lg'
+                      : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
+                    }
+                  `}
+                >
+                  <div className="font-medium mb-1">{opt.label}</div>
+                  <div className={`text-xs ${format === opt.value ? 'text-gray-700' : 'text-white/60'}`}>
+                    {opt.desc}
+                  </div>
+                </button>
+              ))}
             </div>
-          ) : (
-            <>
-              {/* Presets Tab */}
-              {activeTab === 'presets' && (
-                <div className="space-y-6">
-                  <p className="text-white/70">Select a preset to quickly export for common platforms</p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {DEFAULT_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        onClick={() => handlePresetSelect(preset)}
-                        className={`p-5 rounded-xl border-2 transition-all text-left ${
-                          selectedPreset?.id === preset.id
-                            ? 'border-banana bg-banana/10'
-                            : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-                        }`}
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-lg ${
-                            selectedPreset?.id === preset.id
-                              ? 'bg-banana/20 text-banana'
-                              : 'bg-white/10 text-white/70'
-                          }`}>
-                            {PRESET_ICONS[preset.icon] || <FileImage className="h-5 w-5" />}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-1">
-                              {preset.name}
-                            </h3>
-                            <p className="text-white/60 text-sm">
-                              {preset.description}
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {preset.configs.map((config) => (
-                                <span
-                                  key={config.id}
-                                  className="px-2 py-1 bg-white/10 rounded text-xs text-white/70"
-                                >
-                                  {config.format.toUpperCase()} {config.quality}%
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+          </div>
 
-                  {selectedPreset && (
-                    <div className="flex justify-end gap-3 pt-4">
-                      <button
-                        onClick={handleExportPreset}
-                        className="px-6 py-3 bg-banana text-gray-900 font-semibold rounded-lg hover:bg-banana-light transition-colors flex items-center gap-2"
-                      >
-                        <Plus className="h-5 w-5" />
-                        Add to Queue
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Custom Tab */}
-              {activeTab === 'custom' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-white/70">Create custom export configurations</p>
-                    <button
-                      onClick={handleAddCustomConfig}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Configuration
-                    </button>
-                  </div>
-
-                  {customConfigs.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-white/20 rounded-xl">
-                      <Settings className="h-12 w-12 text-white/30 mx-auto mb-3" />
-                      <p className="text-white/60">No custom configurations yet</p>
-                      <p className="text-white/40 text-sm mt-1">Click "Add Configuration" to create one</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {customConfigs.map((config) => (
-                        <div
-                          key={config.id}
-                          className="p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-white font-medium">{config.name}</h4>
-                              <p className="text-white/60 text-sm mt-1">
-                                {config.format.toUpperCase()} • {config.quality}% • {config.resize.mode}
-                                {config.resize.width && config.resize.height && 
-                                  ` • ${config.resize.width}x${config.resize.height}`
-                                }
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setEditingConfig(config)}
-                                className="p-2 hover:bg-white/10 rounded transition-colors"
-                              >
-                                <Settings className="h-4 w-4 text-white/70" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteConfig(config.id)}
-                                className="p-2 hover:bg-red-500/20 rounded transition-colors"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-400" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {customConfigs.length > 0 && (
-                    <div className="flex justify-end gap-3 pt-4">
-                      <button
-                        onClick={handleExportCustom}
-                        className="px-6 py-3 bg-banana text-gray-900 font-semibold rounded-lg hover:bg-banana-light transition-colors flex items-center gap-2"
-                      >
-                        <Plus className="h-5 w-5" />
-                        Add to Queue
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Queue Tab */}
-              {activeTab === 'queue' && (
-                <ExportQueuePanel />
-              )}
-            </>
+          {/* Quality Slider (for JPEG and WebP) */}
+          {(format === 'jpeg' || format === 'webp') && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-white/90">Quality</label>
+                <span className="text-sm text-white/60 font-mono">{quality}%</span>
+              </div>
+              <input
+                type="range"
+                min={60}
+                max={100}
+                value={quality}
+                onChange={(e) => setQuality(Number(e.target.value))}
+                className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:w-4
+                  [&::-webkit-slider-thumb]:h-4
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-banana
+                  [&::-webkit-slider-thumb]:cursor-pointer
+                  [&::-webkit-slider-thumb]:shadow-lg
+                "
+              />
+              <div className="flex justify-between text-xs text-white/50">
+                <span>Smaller file</span>
+                <span>Best quality</span>
+              </div>
+            </div>
           )}
+
+          {/* Aspect Ratio */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-white/90">Aspect Ratio</label>
+            <select
+              value={aspectRatio}
+              onChange={(e) => setAspectRatio(e.target.value as AspectRatioOption)}
+              className="w-full bg-white/5 border border-white/20 rounded-lg p-3 text-white focus:outline-none focus:border-banana focus:ring-2 focus:ring-banana/20"
+            >
+              {aspectRatioOptions.map(opt => (
+                <option key={opt.value} value={opt.value} className="bg-gray-900">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Preview */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-white/90">Preview</label>
+            <div className="aspect-video bg-black/30 rounded-lg overflow-hidden border border-white/10 flex items-center justify-center">
+              <img 
+                src={imageUrl} 
+                alt="Preview" 
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-white/10 bg-black/20">
-          <div className="text-white/60 text-sm">
-            {jobs.length > 0 && (
-              <span>
-                {jobs.filter(j => j.status === 'completed').length} of {jobs.length} completed
-              </span>
+        <div className="p-6 border-t border-white/10 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={isExporting}
+            className="flex-1 px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex-1 px-6 py-3 bg-banana hover:bg-banana-light text-gray-900 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-5 w-5" />
+                Download Image
+              </>
             )}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors"
-            >
-              Close
-            </button>
-            {jobs.length > 0 && !isProcessing && (
-              <button
-                onClick={handleStartExport}
-                className="px-6 py-2 bg-banana text-gray-900 font-semibold rounded-lg hover:bg-banana-light transition-colors flex items-center gap-2"
-              >
-                <Play className="h-4 w-4" />
-                Start Export
-              </button>
-            )}
-          </div>
+          </button>
         </div>
       </div>
-
-      {/* Config Editor Modal */}
-      {editingConfig && (
-        <ExportConfigEditor
-          config={editingConfig}
-          onSave={handleUpdateConfig}
-          onClose={() => setEditingConfig(null)}
-        />
-      )}
     </div>
   );
 }
