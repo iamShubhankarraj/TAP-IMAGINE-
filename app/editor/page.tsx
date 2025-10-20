@@ -1,8 +1,10 @@
 // app/editor/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEditor } from '@/context/EditorContext';
 import { 
   Upload, Sparkles, Sliders, Download, Image as ImageIcon, 
   Grid, ChevronLeft, ChevronRight, Undo, Redo, Save, Share2, 
@@ -28,18 +30,63 @@ import Alert from '@/components/shared/Alert';
 type EditorTab = 'upload' | 'prompt' | 'templates' | 'adjust' | 'filters';
 
 export default function EditorPage() {
-  // State
-  const [primaryImage, setPrimaryImage] = useState<StoredImage | null>(null);
-  const [referenceImages, setReferenceImages] = useState<StoredImage[]>([]);
-  const [generatedImage, setGeneratedImage] = useState<StoredImage | null>(null);
+  // Get editor context
+  const {
+    primaryImage,
+    setPrimaryImage,
+    generatedImage,
+    setGeneratedImage,
+    referenceImages,
+    setReferenceImages,
+    adjustments,
+    setAdjustments,
+    currentFilter,
+    setCurrentFilter,
+    history,
+    setHistory,
+    historyIndex,
+    setHistoryIndex,
+    prompt,
+    setPrompt,
+    getDisplayImage,
+    getImageForProcessing,
+  } = useEditor();
+  
+  // Local state
   const [activeTab, setActiveTab] = useState<EditorTab>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [prompt, setPrompt] = useState('');
-  const [adjustments, setAdjustments] = useState<ImageAdjustments>(defaultAdjustments);
-  const [currentFilter, setCurrentFilter] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Add to history when adjustments change
+  useEffect(() => {
+    // Only add to history if adjustments actually changed
+    const lastHistoryItem = history[historyIndex];
+    if (JSON.stringify(lastHistoryItem) !== JSON.stringify(adjustments)) {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(adjustments);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  }, [adjustments]);
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setAdjustments(history[newIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setAdjustments(history[newIndex]);
+    }
+  };
 
   // Handlers
   const handlePrimaryImageUpload = (image: StoredImage) => {
@@ -48,7 +95,7 @@ export default function EditorPage() {
   };
 
   const handleReferenceImageUpload = (image: StoredImage) => {
-    setReferenceImages(prev => [...prev, image]);
+    setReferenceImages([...referenceImages, image]);
   };
 
   const handleTemplateSelect = async (template: TemplateData) => {
@@ -70,14 +117,20 @@ export default function EditorPage() {
   };
 
   const processImage = async (inputPrompt: string) => {
-    if (!primaryImage) return;
+    // Use the latest edited image if available, otherwise use primary
+    const imageToProcess = getImageForProcessing();
+    
+    if (!imageToProcess) {
+      setError('No image available for processing');
+      return;
+    }
 
     setIsProcessing(true);
     setError(null);
 
     try {
       const result = await generateImageWithGemini({
-        primaryImage: primaryImage.url,
+        primaryImage: imageToProcess, // Use edited image for chaining
         referenceImages: referenceImages.map(img => img.url),
         prompt: inputPrompt,
       });
@@ -86,7 +139,7 @@ export default function EditorPage() {
         setGeneratedImage({
           id: uuidv4(),
           url: result.generatedImage,
-          name: `edited-${primaryImage.name}`,
+          name: `edited-${primaryImage?.name || 'image'}`,
           createdAt: new Date(),
         });
         setActiveTab('adjust');
@@ -105,66 +158,90 @@ export default function EditorPage() {
       setError('No image to export');
       return;
     }
-    setIsExportModalOpen(true);
+    // Redirect to new export page
+    router.push('/editor/export');
   };
 
-  const displayImage = generatedImage || primaryImage;
+  const displayImage = getDisplayImage();
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white">
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-[#0a0a0f] text-white">
+      {/* Premium Animated Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute top-0 -left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-purple-500/20 via-fuchsia-500/10 to-transparent rounded-full blur-[120px] animate-float" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-[900px] h-[900px] bg-gradient-to-tr from-blue-500/20 via-cyan-500/10 to-transparent rounded-full blur-[120px] animate-float-delayed" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
+      </div>
+
       {/* Loading Overlay */}
       {isProcessing && <FunnyLoading />}
 
-      {/* Header */}
-      <header className="h-16 border-b border-white/10 backdrop-blur-md bg-black/20 flex items-center justify-between px-4 md:px-6 z-10">
-        <Link href="/" className="text-2xl font-bold flex items-center hover:opacity-80 transition-opacity">
-          <span className="text-banana">TAP</span>
-          <span className="text-white">[IMAGINE]</span>
+      {/* Header - Premium Glass */}
+      <header className="relative z-10 h-16 border-b border-white/10 backdrop-blur-xl bg-gradient-to-r from-white/5 via-white/10 to-white/5 flex items-center justify-between px-4 md:px-6">
+        <Link href="/" className="group text-2xl font-bold flex items-center transition-all">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-banana to-yellow-400 blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+            <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-banana to-yellow-400">TAP</span>
+          </div>
+          <span className="text-white ml-1">[IMAGINE]</span>
         </Link>
         
         <div className="flex items-center space-x-2">
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Undo">
-            <Undo className="h-5 w-5" />
+          <button 
+            onClick={handleUndo}
+            disabled={historyIndex === 0}
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed" 
+            title="Undo"
+          >
+            <Undo className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Redo">
-            <Redo className="h-5 w-5" />
+          <button 
+            onClick={handleRedo}
+            disabled={historyIndex === history.length - 1}
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed" 
+            title="Redo"
+          >
+            <Redo className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Save">
-            <Save className="h-5 w-5" />
+          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group" title="Save">
+            <Save className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors" title="Share">
-            <Share2 className="h-5 w-5" />
+          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group" title="Share">
+            <Share2 className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
           <button 
             onClick={handleExport}
-            className="ml-2 px-4 py-2 bg-banana hover:bg-banana-light text-gray-900 font-medium rounded-lg transition-colors flex items-center gap-2"
+            className="relative group/export ml-2 px-4 py-2.5 overflow-hidden rounded-xl"
           >
-            <Download className="h-5 w-5" />
-            <span className="hidden sm:inline">Export</span>
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-banana via-yellow-400 to-orange-400 rounded-xl blur opacity-50 group-hover/export:opacity-75 transition duration-200 animate-gradient-x" />
+            <div className="relative flex items-center gap-2 px-2 py-0.5 bg-gradient-to-r from-banana to-yellow-400 rounded-lg text-gray-900 font-semibold transform group-hover/export:scale-105 transition-all duration-200">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </div>
           </button>
         </div>
       </header>
       
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+      <div className="relative z-10 flex flex-1 overflow-hidden">
+        {/* Sidebar - Premium Glass */}
         <aside 
           className={`${
             isSidebarCollapsed ? 'w-0' : 'w-80 lg:w-96'
-          } border-r border-white/10 backdrop-blur-md bg-black/20 flex flex-col transition-all duration-300 overflow-hidden relative`}
+          } border-r border-white/10 backdrop-blur-xl bg-gradient-to-b from-white/5 via-white/10 to-white/5 flex flex-col transition-all duration-300 overflow-hidden relative shadow-2xl`}
         >
-          {/* Sidebar Toggle */}
+          {/* Sidebar Toggle - Enhanced */}
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute -right-3 top-20 z-20 p-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-colors"
+            className="absolute -right-3 top-20 z-20 p-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20 hover:scale-110 transition-all duration-300 shadow-lg group"
           >
             {isSidebarCollapsed ? 
-              <ChevronRight className="h-4 w-4" /> : 
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" /> : 
+              <ChevronLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
             }
           </button>
           
-          {/* Tabs */}
-          <div className="flex border-b border-white/10 overflow-x-auto">
+          {/* Tabs - Premium Glass Tabs */}
+          <div className="flex border-b border-white/10 overflow-x-auto bg-white/5">
             {[
               { id: 'upload' as EditorTab, icon: Upload, label: 'Upload' },
               { id: 'prompt' as EditorTab, icon: Sparkles, label: 'Prompt' },
@@ -175,18 +252,27 @@ export default function EditorPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center justify-center py-3 px-4 flex-1 min-w-0 ${
-                  activeTab === tab.id ? 'bg-white/10 border-b-2 border-banana' : 'hover:bg-white/5'
-                } transition-colors`}
+                className={`relative flex items-center justify-center py-3 px-4 flex-1 min-w-0 group ${
+                  activeTab === tab.id 
+                    ? 'bg-gradient-to-b from-white/15 to-white/10 border-b-2 border-banana shadow-lg' 
+                    : 'hover:bg-white/5'
+                } transition-all duration-300`}
               >
-                <tab.icon className="h-5 w-5 mr-2 flex-shrink-0" />
-                <span className="text-sm truncate">{tab.label}</span>
+                {activeTab === tab.id && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-banana/10 to-transparent" />
+                )}
+                <tab.icon className={`h-5 w-5 mr-2 flex-shrink-0 ${
+                  activeTab === tab.id ? 'text-banana' : 'text-white/60 group-hover:text-white'
+                } transition-colors`} />
+                <span className={`text-sm truncate ${
+                  activeTab === tab.id ? 'text-white font-semibold' : 'text-white/70'
+                }`}>{tab.label}</span>
               </button>
             ))}
           </div>
           
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {/* Tab Content - Enhanced Scrollbar */}
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
             {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
             {activeTab === 'upload' && (
@@ -252,36 +338,69 @@ export default function EditorPage() {
           </div>
         </aside>
         
-        {/* Main Canvas */}
+        {/* Main Canvas - Premium Glass Container */}
         <main className="flex-1 overflow-hidden relative">
-          {/* Grid Background */}
-          <div className="absolute inset-0 opacity-5" style={{
-            backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
-            backgroundSize: '20px 20px'
-          }}></div>
+          {/* Premium Grid Background with Glow */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 opacity-[0.03]" style={{
+              backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+              backgroundSize: '20px 20px'
+            }}></div>
+            {/* Subtle gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5" />
+          </div>
           
           {/* Canvas Content */}
           <div className="absolute inset-0 flex items-center justify-center p-6">
             {displayImage ? (
-              <ImageComparison
-                originalUrl={primaryImage?.url || ''}
-                editedUrl={generatedImage?.url}
-                adjustments={adjustments}
-                filter={currentFilter || undefined}
-              />
+              <div className="relative w-full h-full">
+                {/* Glass frame for image */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative max-w-7xl max-h-full">
+                    {/* Glow effect */}
+                    <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-blue-500/20 rounded-3xl blur-2xl opacity-50" />
+                    {/* Glass container */}
+                    <div className="relative backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-3xl border border-white/20 shadow-2xl p-4">
+                      <ImageComparison
+                        originalUrl={primaryImage?.url || ''}
+                        editedUrl={generatedImage?.url}
+                        adjustments={adjustments}
+                        filter={currentFilter || undefined}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="text-center">
-                <div className="backdrop-blur-md bg-black/30 rounded-2xl p-12 border border-white/10 shadow-2xl max-w-md">
-                  <Camera className="h-20 w-20 text-white/30 mx-auto mb-6" />
-                  <h3 className="text-2xl font-medium text-white mb-3">No Image Selected</h3>
-                  <p className="text-white/60 mb-8">Upload an image to start creating amazing transformations</p>
-                  <button 
-                    onClick={() => setActiveTab('upload')}
-                    className="px-8 py-4 bg-banana hover:bg-banana-light text-gray-900 font-medium rounded-xl transition-all hover:scale-105 inline-flex items-center gap-2"
-                  >
-                    <Upload className="h-5 w-5" />
-                    Upload Image
-                  </button>
+                <div className="relative group">
+                  {/* Glow effect */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-blue-500/30 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000 animate-gradient-x" />
+                  
+                  {/* Glass card */}
+                  <div className="relative backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-3xl p-12 border border-white/20 shadow-2xl max-w-md">
+                    {/* Icon with glow */}
+                    <div className="relative mb-6">
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-xl opacity-30 animate-pulse-slow" />
+                      <div className="relative w-24 h-24 mx-auto bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center border border-white/10">
+                        <Camera className="h-12 w-12 text-white/40" />
+                      </div>
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-white mb-3">No Image Selected</h3>
+                    <p className="text-white/60 mb-8 leading-relaxed">Upload an image to start creating amazing transformations with AI</p>
+                    
+                    <button 
+                      onClick={() => setActiveTab('upload')}
+                      className="relative group/btn overflow-hidden"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-banana via-yellow-400 to-orange-400 rounded-xl blur opacity-50 group-hover/btn:opacity-75 transition duration-200 animate-gradient-x" />
+                      <div className="relative px-8 py-4 bg-gradient-to-r from-banana to-yellow-400 rounded-xl text-gray-900 font-bold inline-flex items-center gap-2 transform group-hover/btn:scale-105 transition-all duration-200">
+                        <Upload className="h-5 w-5" />
+                        Upload Image
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

@@ -23,26 +23,47 @@ export default function ImageComparison({
   const [splitPosition, setSplitPosition] = useState(50);
 
   const cssFilter = generateCSSFilter(adjustments, filter || undefined);
-
   const displayUrl = editedUrl || originalUrl;
 
+  // Calculate vignette effect
+  const vignetteOpacity = Math.abs(adjustments.vignette) / 100;
+  const vignetteSize = 100 - Math.abs(adjustments.vignette);
+  const vignetteRoundness = adjustments.vignetteRoundness;
+
   return (
-    <div className="relative w-full h-full group">
-      {/* Main Image */}
-      <div className="relative w-full h-full overflow-hidden rounded-lg">
+    <div className="relative w-full h-full flex items-center justify-center group">
+      {/* Main Image Container */}
+      <div className="relative max-w-full max-h-full flex items-center justify-center">
         {showOriginal ? (
           <img
             src={originalUrl}
             alt="Original"
-            className="w-full h-full object-contain"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            style={{ maxHeight: 'calc(100vh - 200px)' }}
           />
         ) : (
-          <img
-            src={displayUrl}
-            alt="Edited"
-            className="w-full h-full object-contain transition-all duration-300"
-            style={{ filter: cssFilter }}
-          />
+          <>
+            <img
+              src={displayUrl}
+              alt="Edited"
+              className="max-w-full max-h-full object-contain rounded-lg transition-all duration-300"
+              style={{ 
+                filter: cssFilter,
+                maxHeight: 'calc(100vh - 200px)'
+              }}
+            />
+            
+            {/* Vignette Overlay */}
+            {adjustments.vignette !== 0 && (
+              <div 
+                className="absolute inset-0 pointer-events-none rounded-lg"
+                style={{
+                  background: `radial-gradient(${vignetteRoundness}% ${vignetteSize}% at center, transparent, rgba(0,0,0,${vignetteOpacity}))`,
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            )}
+          </>
         )}
       </div>
 
