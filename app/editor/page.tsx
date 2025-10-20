@@ -8,7 +8,7 @@ import { useEditor } from '@/context/EditorContext';
 import { 
   Upload, Sparkles, Sliders, Download, Image as ImageIcon, 
   Grid, ChevronLeft, ChevronRight, Undo, Redo, Save, Share2, 
-  Maximize2, Camera
+  Maximize2, Camera, Scissors
 } from 'lucide-react';
 import { StoredImage } from '@/types/editor';
 import { TemplateData } from '@/types/templates';
@@ -23,7 +23,10 @@ import TemplatesGrid from '@/components/editor/templates/TemplatesGrid';
 import AdjustmentControls from '@/components/editor/adjustments/AdjustmentControls';
 import FiltersPanel from '@/components/editor/filters/FiltersPanel';
 import ImageComparison from '@/components/editor/canvas/ImageComparison';
+import FloatingLassoButton from '@/components/editor/canvas/FloatingLassoButton';
 import ExportModal from '@/components/editor/export/ExportModal';
+import LassoSelectionTool from '@/components/editor/canvas/LassoSelectionTool';
+import AreaEditModal from '@/components/editor/canvas/AreaEditModal';
 import FunnyLoading from '@/components/animations/FunnyLoading';
 import Alert from '@/components/shared/Alert';
 
@@ -59,6 +62,15 @@ export default function EditorPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Lasso selection state
+  const [showLassoTool, setShowLassoTool] = useState(false);
+  const [showAreaEditModal, setShowAreaEditModal] = useState(false);
+  const [selectionData, setSelectionData] = useState<{
+    imageData: string;
+    maskImage: string;
+    boundingBox: { x: number; y: number; width: number; height: number };
+  } | null>(null);
 
   // Add to history when adjustments change
   useEffect(() => {
@@ -160,6 +172,60 @@ export default function EditorPage() {
     }
     // Redirect to new export page
     router.push('/editor/export');
+  };
+
+  const handleLassoSelection = () => {
+    if (!displayImage) {
+      setError('Please upload an image first');
+      return;
+    }
+    setShowLassoTool(true);
+  };
+
+  const handleSelectionComplete = (maskData: {
+    imageData: string;
+    maskImage: string;
+    boundingBox: { x: number; y: number; width: number; height: number };
+  }) => {
+    setSelectionData(maskData);
+    setShowLassoTool(false);
+    setShowAreaEditModal(true);
+  };
+
+  const handleAreaEditSubmit = async (areaPrompt: string) => {
+    if (!selectionData || !displayImage) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setShowAreaEditModal(false);
+
+    try {
+      // Create a detailed prompt for area-specific editing
+      const { boundingBox } = selectionData;
+      const detailedPrompt = `In this image, modify ONLY the selected area at position x:${Math.round(boundingBox.x)}, y:${Math.round(boundingBox.y)}, width:${Math.round(boundingBox.width)}, height:${Math.round(boundingBox.height)}. ${areaPrompt}. Keep all other parts of the image exactly the same. Do not change anything outside this specific area.`;
+
+      const result = await generateImageWithGemini({
+        primaryImage: displayImage.url,
+        referenceImages: referenceImages.map(img => img.url),
+        prompt: detailedPrompt,
+      });
+
+      if (result.success && result.generatedImage) {
+        setGeneratedImage({
+          id: uuidv4(),
+          url: result.generatedImage,
+          name: `area-edited-${primaryImage?.name || 'image'}`,
+          createdAt: new Date(),
+        });
+        setSelectionData(null);
+      } else {
+        setError(result.error || 'Failed to edit area');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const displayImage = getDisplayImage();
@@ -372,6 +438,12 @@ export default function EditorPage() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Floating Lasso Button */}
+                <FloatingLassoButton 
+                  onClick={handleLassoSelection}
+                  disabled={!displayImage}
+                />
               </div>
             ) : (
               <div className="text-center">
@@ -416,6 +488,29 @@ export default function EditorPage() {
         onClose={() => setIsExportModalOpen(false)}
         imageUrl={displayImage?.url || null}
         adjustments={adjustments}
+      />
+
+      {/* Lasso Selection Tool */}
+      {showLassoTool && displayImage && (
+        <LassoSelectionTool
+          imageUrl={displayImage.url}
+          onSelectionComplete={handleSelectionComplete}
+          onCancel={() => {
+            setShowLassoTool(false);
+            setSelectionData(null);
+          }}
+        />
+      )}
+
+      {/* Area Edit Modal */}
+      <AreaEditModal
+        isOpen={showAreaEditModal}
+        onClose={() => {
+          setShowAreaEditModal(false);
+          setSelectionData(null);
+        }}
+        onSubmit={handleAreaEditSubmit}
+        isProcessing={isProcessing}
       />
     </div>
   );
