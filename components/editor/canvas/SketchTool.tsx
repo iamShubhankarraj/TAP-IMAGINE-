@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { X, Pencil, Eraser, Minus, Plus, RotateCcw, Sparkles, Send, Loader2, AlertCircle } from 'lucide-react';
+import { X, Pencil, Eraser, Minus, Plus, RotateCcw, Sparkles, Send } from 'lucide-react';
 
 interface SketchToolProps {
   imageUrl: string;
@@ -13,71 +13,70 @@ type Tool = 'pencil' | 'eraser';
 
 export default function SketchTool({ imageUrl, onClose, onSketchComplete }: SketchToolProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>('pencil');
   const [brushSize, setBrushSize] = useState(5);
   const [prompt, setPrompt] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Initialize canvas with image
+  // Initialize canvas with image - SAME AS LASSO TOOL
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new Image();
+    console.log('🎨 SketchTool: Starting image load, URL:', imageUrl.substring(0, 100));
     
-    // Handle both data URLs and regular URLs
-    if (imageUrl.startsWith('data:')) {
-      // Data URL - no CORS issues
-      img.src = imageUrl;
-    } else {
-      // Regular URL - try with and without CORS
-      img.crossOrigin = 'anonymous';
-      img.src = imageUrl;
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.log('❌ Canvas ref not available');
+      return;
     }
 
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.log('❌ Canvas context not available');
+      return;
+    }
+
+    // Load image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    // Timeout fallback
+    const timeoutId = setTimeout(() => {
+      if (!imageRef.current) {
+        console.log('⏰ Image load timeout, setting loaded anyway');
+        setImageLoaded(true);
+      }
+    }, 5000);
+    
     img.onload = () => {
-      console.log('✅ Image loaded successfully:', {
+      console.log('✅ Image loaded successfully!', {
         width: img.width,
-        height: img.height,
-        src: imageUrl.substring(0, 50) + '...'
+        height: img.height
       });
       
-      // Set canvas size to match image
       canvas.width = img.width;
       canvas.height = img.height;
-
-      // Draw the original image
       ctx.drawImage(img, 0, 0);
-      setIsLoading(false);
-      setLoadError(null);
+      imageRef.current = img;
+      setImageLoaded(true);
+      
+      console.log('✅ Canvas updated, imageLoaded set to true');
+      clearTimeout(timeoutId);
     };
-
+    
     img.onerror = (error) => {
-      console.error('❌ Failed to load image:', error);
-      console.log('Image URL:', imageUrl);
+      console.error('❌ Image failed to load:', error);
+      console.log('Failed URL:', imageUrl);
+      clearTimeout(timeoutId);
       
-      // Try without CORS as fallback
-      const imgFallback = new Image();
-      imgFallback.src = imageUrl; // No crossOrigin
-      
-      imgFallback.onload = () => {
-        console.log('✅ Image loaded with fallback (no CORS)');
-        canvas.width = imgFallback.width;
-        canvas.height = imgFallback.height;
-        ctx.drawImage(imgFallback, 0, 0);
-        setIsLoading(false);
-      };
-      
-      imgFallback.onerror = () => {
-        console.error('❌ Fallback also failed');
-        setIsLoading(false);
-        setLoadError('Failed to load image. The image might be in an unsupported format.');
-      };
+      // Set loaded anyway to show canvas
+      setImageLoaded(true);
+    };
+    
+    img.src = imageUrl;
+    
+    return () => {
+      clearTimeout(timeoutId);
     };
   }, [imageUrl]);
 
@@ -138,19 +137,14 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !imageRef.current) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Reload original image
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imageUrl;
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-    };
+    // Redraw original image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imageRef.current, 0, 0);
   };
 
   const handleSubmit = () => {
@@ -161,6 +155,18 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
     const sketchedImage = canvas.toDataURL('image/png');
     onSketchComplete(sketchedImage, prompt.trim());
   };
+
+  // Redraw canvas when imageLoaded changes
+  useEffect(() => {
+    if (imageLoaded && imageRef.current && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        ctx.drawImage(imageRef.current, 0, 0);
+        console.log('🎨 Canvas redrawn with image');
+      }
+    }
+  }, [imageLoaded]);
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -188,38 +194,28 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Canvas Area */}
             <div className="lg:col-span-2">
-              <div className="relative bg-gray-800/50 rounded-xl border border-white/10 overflow-hidden">
-                {isLoading ? (
-                  <div className="w-full h-96 flex flex-col items-center justify-center gap-4">
-                    <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-                    <div className="text-white/60">Loading image...</div>
-                    <div className="text-white/40 text-xs max-w-md text-center px-4">
-                      Image URL: {imageUrl.substring(0, 60)}...
-                    </div>
+              <div className="relative bg-gray-800/50 rounded-xl border border-white/10 overflow-hidden min-h-[400px] flex items-center justify-center">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  className="w-full h-auto cursor-crosshair"
+                  style={{ 
+                    maxHeight: '600px',
+                    display: imageLoaded ? 'block' : 'none'
+                  }}
+                />
+                <div 
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  style={{ display: imageLoaded ? 'none' : 'flex' }}
+                >
+                  <div className="text-white/60 text-center">
+                    <div className="mb-2">Loading image...</div>
+                    <div className="text-xs text-white/40 max-w-xs truncate">{imageUrl.substring(0, 60)}...</div>
                   </div>
-                ) : loadError ? (
-                  <div className="w-full h-96 flex flex-col items-center justify-center gap-4 p-8">
-                    <AlertCircle className="w-12 h-12 text-red-400" />
-                    <div className="text-red-300 font-medium">Error Loading Image</div>
-                    <div className="text-white/60 text-sm text-center max-w-md">{loadError}</div>
-                    <button
-                      onClick={onClose}
-                      className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-                    >
-                      Close & Try Again
-                    </button>
-                  </div>
-                ) : (
-                  <canvas
-                    ref={canvasRef}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    className="w-full h-auto cursor-crosshair"
-                    style={{ maxHeight: '600px' }}
-                  />
-                )}
+                </div>
               </div>
             </div>
 
