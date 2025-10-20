@@ -24,8 +24,10 @@ import AdjustmentControls from '@/components/editor/adjustments/AdjustmentContro
 import FiltersPanel from '@/components/editor/filters/FiltersPanel';
 import ImageComparison from '@/components/editor/canvas/ImageComparison';
 import FloatingLassoButton from '@/components/editor/canvas/FloatingLassoButton';
+import FloatingSketchButton from '@/components/editor/canvas/FloatingSketchButton';
 import ExportModal from '@/components/editor/export/ExportModal';
 import LassoSelectionTool from '@/components/editor/canvas/LassoSelectionTool';
+import SketchTool from '@/components/editor/canvas/SketchTool';
 import AreaEditModal from '@/components/editor/canvas/AreaEditModal';
 import FunnyLoading from '@/components/animations/FunnyLoading';
 import Alert from '@/components/shared/Alert';
@@ -71,6 +73,9 @@ export default function EditorPage() {
     maskImage: string;
     boundingBox: { x: number; y: number; width: number; height: number };
   } | null>(null);
+
+  // Sketch tool state
+  const [showSketchTool, setShowSketchTool] = useState(false);
 
   // Add to history when adjustments change
   useEffect(() => {
@@ -180,6 +185,53 @@ export default function EditorPage() {
       return;
     }
     setShowLassoTool(true);
+  };
+
+  const handleSketchTool = () => {
+    if (!displayImage) {
+      setError('Please upload an image first');
+      return;
+    }
+    console.log('🎨 Opening sketch tool with image:', {
+      url: displayImage.url,
+      name: displayImage.name,
+      isDataURL: displayImage.url.startsWith('data:'),
+      urlPreview: displayImage.url.substring(0, 100)
+    });
+    setShowSketchTool(true);
+  };
+
+  const handleSketchComplete = async (sketchedImage: string, sketchPrompt: string) => {
+    setShowSketchTool(false);
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      // Create detailed prompt for sketch-based generation
+      const detailedPrompt = `Using the red sketch marks as a guide, ${sketchPrompt}. The red lines indicate where and what shape to create. Make it look realistic and natural, blending perfectly with the rest of the image. Remove all red sketch marks in the final result.`;
+
+      const result = await generateImageWithGemini({
+        primaryImage: sketchedImage, // Send the sketched image
+        referenceImages: referenceImages.map(img => img.url),
+        prompt: detailedPrompt,
+      });
+
+      if (result.success && result.generatedImage) {
+        setGeneratedImage({
+          id: uuidv4(),
+          url: result.generatedImage,
+          name: `sketch-generated-${primaryImage?.name || 'image'}`,
+          createdAt: new Date(),
+        });
+        setActiveTab('adjust');
+      } else {
+        setError(result.error || 'Failed to generate from sketch');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSelectionComplete = (maskData: {
@@ -444,6 +496,12 @@ export default function EditorPage() {
                   onClick={handleLassoSelection}
                   disabled={!displayImage}
                 />
+
+                {/* Floating Sketch Button */}
+                <FloatingSketchButton 
+                  onClick={handleSketchTool}
+                  disabled={!displayImage}
+                />
               </div>
             ) : (
               <div className="text-center">
@@ -499,6 +557,15 @@ export default function EditorPage() {
             setShowLassoTool(false);
             setSelectionData(null);
           }}
+        />
+      )}
+
+      {/* Sketch Tool */}
+      {showSketchTool && displayImage && (
+        <SketchTool
+          imageUrl={displayImage.url}
+          onClose={() => setShowSketchTool(false)}
+          onSketchComplete={handleSketchComplete}
         />
       )}
 
