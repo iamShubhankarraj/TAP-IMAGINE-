@@ -311,6 +311,8 @@ export default function EditorPage() {
                 onSubmit={handlePromptSubmit}
                 isProcessing={isProcessing}
                 disabled={!primaryImage}
+                referenceImages={referenceImages}
+                onReferenceImagesChange={setReferenceImages}
               />
             )}
             

@@ -1,6 +1,276 @@
 {
     "templates": [
       {
+        "id": "ai-saree-portrait",
+        "name": "AI Saree Portrait",
+        "description": "90s Bollywood style saree portrait",
+        "prompt": "Create a 4K HD portrait of the uploaded person wearing a flowing chiffon saree in a 90s-Bollywood style. Warm golden-hour side lighting, wind gently sweeping the fabric, soft film grain texture. Keep the face exactly as in the uploaded photo, no changes.",
+        "category": "portrait",
+        "thumbnail": "/templates/ai-saree.jpg",
+        "tags": ["portrait", "indian", "traditional", "bollywood"]
+      },
+      {
+        "id": "3d-figurine",
+        "name": "3D Action Figurine",
+        "description": "High-detail plastic action figure",
+        "prompt": "Turn the uploaded person (or pet) into a high-detail plastic action figure in a collector's display box. Pose dynamic, with stylized lighting, ultra-realistic textures, glossy finish, dramatic shadows.",
+        "category": "fun",
+        "thumbnail": "/templates/3d-figurine.jpg",
+        "tags": ["3d", "toy", "figurine", "collector"]
+      },
+      {
+        "id": "polaroid-celeb",
+        "name": "Polaroid with Celebrity",
+        "description": "Vintage Polaroid snapshot",
+        "prompt": "Generate a Polaroid-style photo of the uploaded person standing next to [famous actor/character], casual candid pose, slightly faded vintage colour palette, white Polaroid border, snapshot feel.",
+        "category": "fun",
+        "thumbnail": "/templates/polaroid-celeb.jpg",
+        "tags": ["polaroid", "vintage", "celebrity", "candid"]
+      },
+      {
+        "id": "festive-couple",
+        "name": "Festive Couple Portrait",
+        "description": "Diwali/Dhanteras celebration",
+        "prompt": "Create a cinematic portrait of a couple (the uploaded person + partner) in traditional Indian festive attire (saree + kurta) surrounded by diyas, marigolds, warm ambient lighting, backdrop of festive lights. 4K resolution.",
+        "category": "portrait",
+        "thumbnail": "/templates/festive-couple.jpg",
+        "tags": ["festival", "couple", "diwali", "traditional"]
+      },
+      {
+        "id": "vintage-80s-90s",
+        "name": "Vintage 80s/90s Throwback",
+        "description": "Retro mall portrait scene",
+        "prompt": "Transform the uploaded person into a stylish 1980s mall-portrait scene: pastel blazer, high-waisted pants, retro filter, slightly grainy film texture, neon signage in the background, excited pose.",
+        "category": "style",
+        "thumbnail": "/templates/vintage-80s.jpg",
+        "tags": ["80s", "90s", "retro", "vintage"]
+      },
+      {
+        "id": "travel-landmarks",
+        "name": "Travel Landmarks",
+        "description": "Tourist photo at iconic locations",
+        "prompt": "Place the uploaded person in front of the Eiffel Tower at dusk, gently lit, cinematic wide-angle, shallow depth of field, warm glow, subtle motion-blur on crowds — make it feel like a travel snapshot.",
+        "category": "fantasy",
+        "thumbnail": "/templates/travel-landmark.jpg",
+        "tags": ["travel", "landmark", "tourism", "cinematic"]
+      },
+      {
+        "id": "fashion-transformation",
+        "name": "Fashion Style Transformation",
+        "description": "Modern Indian editorial look",
+        "prompt": "Re-imagine the uploaded person wearing a minimal-chic modern Indian outfit (monochrome saree or fusion pants + kurta), surrounded by a tastefully decorated interior with plants, soft natural lighting, high-end editorial feel.",
+        "category": "style",
+        "thumbnail": "/templates/fashion-transform.jpg",
+        "tags": ["fashion", "editorial", "modern", "chic"]
+      },
+      {
+        "id": "pet-hero",
+        "name": "Pet as Hero Figurine",
+        "description": "Heroic pet transformation",
+        "prompt": "Turn the uploaded pet into a heroic figurine: muscular pose, stylised armour or cape, dramatic spotlight, pedestal base, poster-style composition, ultra-detailed fur texture.",
+        "category": "fun",
+        "thumbnail": "/templates/pet-hero.jpg",
+        "tags": ["pet", "hero", "figurine", "dramatic"]
+      },
+      {
+        "id": "family-festive",
+        "name": "Family Festive Scene",
+        "description": "Large family portrait",
+        "prompt": "Create a large family portrait in Indian festive dress, everyone coordinated colours, warm golden lighting, elegant hall backdrop, smiley candid moment, cinematic quality.",
+        "category": "portrait",
+        "thumbnail": "/templates/family-festive.jpg",
+        "tags": ["family", "festival", "group", "traditional"]
+      },
+      {
+        "id": "street-festival",
+        "name": "Festival Street Scene",
+        "description": "Nostalgic night street lighting",
+        "prompt": "Place the uploaded person on an Indian festival-lit street at night: string lights, paper lanterns, bustling crowd, warm ambient glow, motion-blur on passing vehicles, high dynamic range.",
+        "category": "style",
+        "thumbnail": "/templates/street-festival.jpg",
+        "tags": ["street", "festival", "night", "lights"]
+      },
+      {
+        "id": "interior-design",
+        "name": "Interior Design Makeover",
+        "description": "Styled home interior",
+        "prompt": "Show the uploaded person standing in a newly styled open-plan living room: Scandinavian Indian fusion décor, plants, muted palette, large windows, soft natural daylight, editorial photograph.",
+        "category": "style",
+        "thumbnail": "/templates/interior-design.jpg",
+        "tags": ["interior", "home", "design", "editorial"]
+      },
+      {
+        "id": "multi-pose",
+        "name": "Character Consistency",
+        "description": "Multi-outfit photo wall",
+        "prompt": "Generate four frames of the uploaded person in different outfits (traditional, casual, formal, street) but same face and same hair-style for continuity, arranged as a photo-wall layout, consistent lighting and background.",
+        "category": "portrait",
+        "thumbnail": "/templates/multi-pose.jpg",
+        "tags": ["multipose", "consistency", "outfits", "collage"]
+      },
+      {
+        "id": "moonlight-romantic",
+        "name": "Moonlight Romance",
+        "description": "Romantic night scene",
+        "prompt": "Create a romantic night-scene of the uploaded person (or couple) under a full moon, gentle wind, soft moonlight casting long shadows, subtle film grain, deep blue-purple tones, dreamy ambience.",
+        "category": "portrait",
+        "thumbnail": "/templates/moonlight.jpg",
+        "tags": ["romantic", "moonlight", "night", "dreamy"]
+      },
+      {
+        "id": "gold-jewellery",
+        "name": "Gold Jewellery Glamour",
+        "description": "High-glamour portrait",
+        "prompt": "Transform the uploaded person into a high-glamour portrait wearing heavy gold jewellery, designer saree or lehenga, rich backdrop of marigolds and diyas, soft cinematic lighting, ultra-realistic metal textures.",
+        "category": "portrait",
+        "thumbnail": "/templates/gold-jewellery.jpg",
+        "tags": ["glamour", "jewellery", "traditional", "luxury"]
+      },
+      {
+        "id": "minimalist-modern",
+        "name": "Minimalist Modern",
+        "description": "Clean contemporary aesthetic",
+        "prompt": "Style the uploaded person in a modern, minimalist outfit (solid-colour asymmetrical drape), standing in a minimalist interior (white walls, geometric décor, single sculptural plant), natural daylight, no clutter.",
+        "category": "style",
+        "thumbnail": "/templates/minimalist.jpg",
+        "tags": ["minimalist", "modern", "clean", "contemporary"]
+      },
+      {
+        "id": "younger-older-self",
+        "name": "Younger & Older Self",
+        "description": "Age comparison scene",
+        "prompt": "Create an image of the uploaded adult person sitting across from their younger-self (child version) in a cozy vintage living room, shared tea-cup table, warm nostalgic lighting, photorealistic, same face in both but different age.",
+        "category": "portrait",
+        "thumbnail": "/templates/age-comparison.jpg",
+        "tags": ["age", "nostalgia", "comparison", "time"]
+      },
+      {
+        "id": "scifi-traditional",
+        "name": "Sci-Fi Traditional Fusion",
+        "description": "Fantasy futuristic background",
+        "prompt": "Place the uploaded person wearing a traditional Indian outfit (saree or kurta) inside a futuristic sci-fi environment (hovering city, neon lights, flying vehicles), dramatic cinematic lighting, ultra-detailed textures.",
+        "category": "fantasy",
+        "thumbnail": "/templates/scifi-traditional.jpg",
+        "tags": ["scifi", "traditional", "fusion", "futuristic"]
+      },
+      {
+        "id": "rangoli-art",
+        "name": "Floral Rangoli Art",
+        "description": "Overhead festive rangoli",
+        "prompt": "Generate an overhead shot of the uploaded person sitting next to a giant creative rangoli made of flowers and sweets, vibrant colours, soft morning light, top-down view, decorative festive mood.",
+        "category": "artistic",
+        "thumbnail": "/templates/rangoli.jpg",
+        "tags": ["rangoli", "festival", "flowers", "overhead"]
+      },
+      {
+        "id": "rooftop-fireworks",
+        "name": "Rooftop Fireworks",
+        "description": "Celebration night scene",
+        "prompt": "Create a dynamic evening rooftop scene: the uploaded person surrounded by friends, holding sparklers, fireworks bursting in the sky behind, city skyline in background, motion-blur, high energy, rich colour palette.",
+        "category": "style",
+        "thumbnail": "/templates/rooftop-fireworks.jpg",
+        "tags": ["fireworks", "celebration", "night", "rooftop"]
+      },
+      {
+        "id": "chiffon-motion",
+        "name": "Chiffon Saree in Motion",
+        "description": "Flowing fabric couture",
+        "prompt": "Make a full-length portrait of the uploaded person wearing a semi-transparent chiffon saree flowing in wind, sunset glow on fabric, warm back-light, soft film grain, couture-magazine style.",
+        "category": "portrait",
+        "thumbnail": "/templates/chiffon-motion.jpg",
+        "tags": ["fashion", "saree", "motion", "couture"]
+      },
+      {
+        "id": "toy-packaging",
+        "name": "Toy Figurine Packaging",
+        "description": "Collector's box design",
+        "prompt": "Convert the uploaded person into a high-detail toy-figurine inside a collector's box: bold packaging graphics, acrylic window, design branding style, dramatic studio lighting, high-gloss finish.",
+        "category": "fun",
+        "thumbnail": "/templates/toy-packaging.jpg",
+        "tags": ["toy", "packaging", "collector", "3d"]
+      },
+      {
+        "id": "16bit-game",
+        "name": "16-bit Game Character",
+        "description": "Retro video game pixel art",
+        "prompt": "Turn the uploaded person into a 16-bit video game pixel-art character, standing in a colorful retro platformer level, pixel clouds and 8-bit enemies visible in background, nostalgic game vibe.",
+        "category": "artistic",
+        "thumbnail": "/templates/16bit-game.jpg",
+        "tags": ["pixel", "retro", "gaming", "16bit"]
+      },
+      {
+        "id": "hologram-ar",
+        "name": "Hologram AR Portrait",
+        "description": "Futuristic hologram style",
+        "prompt": "Create a futuristic hologram-style portrait of the uploaded person: translucent digital overlay, neon outlines, floating data lines, dark background, glowing edges, sci-fi atmosphere.",
+        "category": "fantasy",
+        "thumbnail": "/templates/hologram.jpg",
+        "tags": ["hologram", "ar", "futuristic", "scifi"]
+      },
+      {
+        "id": "celebrity-mashup",
+        "name": "Celebrity Mash-up",
+        "description": "Red carpet with celebrity",
+        "prompt": "Generate a realistic photograph of the uploaded person standing next to [celebrity name] on a red carpet event, both posing, flashing cameras, glamorous gowns/suits, high contrast studio lighting.",
+        "category": "fun",
+        "thumbnail": "/templates/celebrity-mashup.jpg",
+        "tags": ["celebrity", "red-carpet", "glamour", "event"]
+      },
+      {
+        "id": "coordinated-family",
+        "name": "Coordinated Family",
+        "description": "Matching pastel outfits",
+        "prompt": "Create a joyful family photo of the uploaded person + family members wearing coordinated pastel Indian festive outfits, garden-setting, string lights overhead, casual candid smiles, high-resolution, bright natural lighting.",
+        "category": "portrait",
+        "thumbnail": "/templates/coordinated-family.jpg",
+        "tags": ["family", "coordinated", "pastel", "garden"]
+      },
+      {
+        "id": "geometric-festive",
+        "name": "Geometric Festive Decor",
+        "description": "Minimal modern festive",
+        "prompt": "Style the uploaded person in a contemporary festive outfit standing in front of a minimal geometric wall art installation, muted colours, accent light from one side, soft shadows, editorial portrait.",
+        "category": "style",
+        "thumbnail": "/templates/geometric-festive.jpg",
+        "tags": ["geometric", "minimalist", "festive", "contemporary"]
+      },
+      {
+        "id": "temple-cinematic",
+        "name": "Cinematic Temple",
+        "description": "Dramatic temple corridor",
+        "prompt": "Create a dramatic portrait of the uploaded person standing in an ancient temple corridor, shafts of golden light through stone lattice, rich textures on stone walls, heavy shadows, cinematic feel.",
+        "category": "portrait",
+        "thumbnail": "/templates/temple-cinematic.jpg",
+        "tags": ["temple", "cinematic", "dramatic", "traditional"]
+      },
+      {
+        "id": "color-pop-fashion",
+        "name": "Color-Pop Fashion",
+        "description": "Bold fashion editorial",
+        "prompt": "Transform the uploaded person into a bold fashion portrait: bright fuchsia outfit, contrasting background (turquoise), dramatic side-lighting, high-gloss magazine-style finish, strong makeup.",
+        "category": "style",
+        "thumbnail": "/templates/color-pop.jpg",
+        "tags": ["fashion", "colorful", "bold", "editorial"]
+      },
+      {
+        "id": "scenic-wind",
+        "name": "Scenic Wind Movement",
+        "description": "Dynamic outdoor scene",
+        "prompt": "Generate an image of the uploaded person on a cliff-edge overlooking the sea, scarf or dupatta flowing in strong wind, golden hour light, dynamic pose, cinematic framing.",
+        "category": "portrait",
+        "thumbnail": "/templates/scenic-wind.jpg",
+        "tags": ["outdoor", "wind", "scenic", "dramatic"]
+      },
+      {
+        "id": "shallow-dof-portrait",
+        "name": "Shallow Depth Portrait",
+        "description": "Studio editorial look",
+        "prompt": "Create a studio-style portrait of the uploaded person: shallow depth-of-field (blurry background), dramatic rim lighting, soft key-light, monochrome outfit, minimalist setting, high-end editorial look.",
+        "category": "portrait",
+        "thumbnail": "/templates/shallow-dof.jpg",
+        "tags": ["portrait", "studio", "editorial", "dof"]
+      },
+      {
         "id": "child",
         "name": "You as a Child",
         "description": "Transform into your younger self",
