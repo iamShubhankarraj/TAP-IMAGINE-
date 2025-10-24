@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { X, Pencil, Eraser, Minus, Plus, RotateCcw, Sparkles, Send } from 'lucide-react';
+import { X, Pencil, Eraser, Minus, Plus, RotateCcw, Sparkles, Send, Square, Circle, Triangle } from 'lucide-react';
 
 interface SketchToolProps {
   imageUrl: string;
@@ -9,7 +9,8 @@ interface SketchToolProps {
   onSketchComplete: (sketchedImage: string, prompt: string) => void;
 }
 
-type Tool = 'pencil' | 'eraser';
+type Tool = 'pencil' | 'eraser' | 'rectangle' | 'circle' | 'triangle';
+type Color = 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'black' | 'white';
 
 export default function SketchTool({ imageUrl, onClose, onSketchComplete }: SketchToolProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -19,6 +20,25 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
   const [brushSize, setBrushSize] = useState(5);
   const [prompt, setPrompt] = useState('');
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [color, setColor] = useState<Color>('red');
+  const [shapeStart, setShapeStart] = useState<{x: number, y: number} | null>(null);
+  const [currentPoint, setCurrentPoint] = useState<{x: number, y: number} | null>(null);
+
+  // Color palette
+  const colors: Color[] = ['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'orange', 'black', 'white'];
+  
+  // Map color names to actual color values
+  const colorMap: Record<Color, string> = {
+    red: '#FF0000',
+    blue: '#0000FF',
+    green: '#00FF00',
+    yellow: '#FFFF00',
+    purple: '#800080',
+    pink: '#FFC0CB',
+    orange: '#FFA500',
+    black: '#000000',
+    white: '#FFFFFF'
+  };
 
   // Initialize canvas with image - SAME AS LASSO TOOL
   useEffect(() => {
@@ -88,27 +108,35 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    setIsDrawing(true);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (tool === 'pencil') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = '#FF0000'; // Red for visibility
-      ctx.lineWidth = brushSize * scaleX; // Scale brush size to canvas
-    } else {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize * 2 * scaleX; // Scale eraser size to canvas
-    }
-
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
     
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    if (tool === 'pencil' || tool === 'eraser') {
+      setIsDrawing(true);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+
+      if (tool === 'pencil') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = colorMap[color];
+        ctx.lineWidth = brushSize * scaleX; // Scale brush size to canvas
+      } else {
+        // Proper eraser implementation
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+        ctx.lineWidth = brushSize * scaleX * 2; // Make eraser slightly larger
+      }
+    } else {
+      // For shape tools
+      setIsDrawing(true);
+      setShapeStart({ x, y });
+      setCurrentPoint({ x, y });
+    }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -127,12 +155,19 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    if (tool === 'pencil' || tool === 'eraser') {
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    } else {
+      // For shape tools, we'll draw a preview
+      setCurrentPoint({ x, y });
+    }
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    setShapeStart(null);
+    setCurrentPoint(null);
   };
 
   const clearCanvas = () => {
@@ -167,6 +202,63 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
       }
     }
   }, [imageLoaded]);
+
+  // Draw shape preview during drawing
+  useEffect(() => {
+    if (!isDrawing || !shapeStart || !currentPoint || 
+        (tool !== 'rectangle' && tool !== 'circle' && tool !== 'triangle')) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Save the current context
+    ctx.save();
+    
+    // Clear the preview by redrawing the image
+    if (imageRef.current) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imageRef.current, 0, 0);
+    }
+    
+    // Draw the preview shape
+    const width = currentPoint.x - shapeStart.x;
+    const height = currentPoint.y - shapeStart.y;
+    
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = colorMap[color];
+    ctx.lineWidth = brushSize * (canvas.width / canvas.getBoundingClientRect().width);
+    ctx.setLineDash([5, 5]); // Dashed line for preview
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    if (tool === 'rectangle') {
+      ctx.strokeRect(shapeStart.x, shapeStart.y, width, height);
+    } else if (tool === 'circle') {
+      const centerX = (shapeStart.x + currentPoint.x) / 2;
+      const centerY = (shapeStart.y + currentPoint.y) / 2;
+      const radiusX = Math.abs(width) / 2;
+      const radiusY = Math.abs(height) / 2;
+      
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (tool === 'triangle') {
+      ctx.beginPath();
+      ctx.moveTo(shapeStart.x + width / 2, shapeStart.y); // Top point
+      ctx.lineTo(shapeStart.x, shapeStart.y + height); // Bottom left
+      ctx.lineTo(shapeStart.x + width, shapeStart.y + height); // Bottom right
+      ctx.closePath();
+      ctx.stroke();
+    }
+    
+    // Restore the context
+    ctx.restore();
+  }, [isDrawing, shapeStart, currentPoint, tool, color, brushSize, colorMap]);
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -224,29 +316,85 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
               {/* Tool Selection */}
               <div className="bg-gray-800/50 rounded-xl border border-white/10 p-4">
                 <label className="block text-white font-medium mb-3">Drawing Tool</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setTool('pencil')}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all ${
                       tool === 'pencil'
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/50'
                         : 'bg-white/5 text-white/70 hover:bg-white/10'
                     }`}
                   >
                     <Pencil className="w-4 h-4" />
-                    <span className="text-sm font-medium">Pencil</span>
+                    <span className="text-xs font-medium">Pencil</span>
                   </button>
                   <button
                     onClick={() => setTool('eraser')}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all ${
                       tool === 'eraser'
                         ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/50'
                         : 'bg-white/5 text-white/70 hover:bg-white/10'
                     }`}
                   >
                     <Eraser className="w-4 h-4" />
-                    <span className="text-sm font-medium">Eraser</span>
+                    <span className="text-xs font-medium">Eraser</span>
                   </button>
+                  <button
+                    onClick={() => setTool('rectangle')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                      tool === 'rectangle'
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
+                        : 'bg-white/5 text-white/70 hover:bg-white/10'
+                    }`}
+                  >
+                    <Square className="w-4 h-4" />
+                    <span className="text-xs font-medium">Rect</span>
+                  </button>
+                  <button
+                    onClick={() => setTool('circle')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                      tool === 'circle'
+                        ? 'bg-green-500 text-white shadow-lg shadow-green-500/50'
+                        : 'bg-white/5 text-white/70 hover:bg-white/10'
+                    }`}
+                  >
+                    <Circle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Circle</span>
+                  </button>
+                  <button
+                    onClick={() => setTool('triangle')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                      tool === 'triangle'
+                        ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/50'
+                        : 'bg-white/5 text-white/70 hover:bg-white/10'
+                    }`}
+                  >
+                    <Triangle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Tri</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Palette */}
+              <div className="bg-gray-800/50 rounded-xl border border-white/10 p-4">
+                <label className="block text-white font-medium mb-3">Color Palette</label>
+                <div className="grid grid-cols-9 gap-1">
+                  {colors.map((colorOption) => (
+                    <button
+                      key={colorOption}
+                      onClick={() => setColor(colorOption)}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                        color === colorOption
+                          ? 'border-white scale-110 shadow-lg'
+                          : 'border-white/30 hover:border-white/60'
+                      }`}
+                      style={{ backgroundColor: colorMap[colorOption] }}
+                      title={colorOption.charAt(0).toUpperCase() + colorOption.slice(1)}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 text-center text-sm text-white/70">
+                  Selected: <span className="capitalize font-medium">{color}</span>
                 </div>
               </div>
 
@@ -270,7 +418,7 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
                     onChange={(e) => setBrushSize(parseInt(e.target.value))}
                     className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, rgb(168, 85, 247) 0%, rgb(168, 85, 247) ${(brushSize / 50) * 100}%, rgba(255,255,255,0.1) ${(brushSize / 50) * 100}%, rgba(255,255,255,0.1) 100%)`
+                      background: `linear-gradient(to right, ${colorMap[color]} 0%, ${colorMap[color]} ${(brushSize / 50) * 100}%, rgba(255,255,255,0.1) ${(brushSize / 50) * 100}%, rgba(255,255,255,0.1) 100%)`
                     }}
                   />
                   <button
@@ -283,10 +431,11 @@ export default function SketchTool({ imageUrl, onClose, onSketchComplete }: Sket
                 {/* Brush preview */}
                 <div className="mt-3 flex items-center justify-center">
                   <div 
-                    className="rounded-full bg-purple-500"
+                    className="rounded-full"
                     style={{ 
                       width: `${Math.min(brushSize * 2, 100)}px`, 
-                      height: `${Math.min(brushSize * 2, 100)}px` 
+                      height: `${Math.min(brushSize * 2, 100)}px`,
+                      backgroundColor: colorMap[color]
                     }}
                   />
                 </div>

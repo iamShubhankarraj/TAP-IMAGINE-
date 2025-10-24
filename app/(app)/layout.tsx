@@ -1,6 +1,6 @@
-import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { ImageStoreProvider } from '@/context/image-store';
+import { AuthProvider } from '@/context/auth-context';
 
 export default function AppLayout({
   children,
@@ -8,14 +8,15 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ImageStoreProvider>
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
-      </div>
-    </ImageStoreProvider>
+    <AuthProvider>
+      <ImageStoreProvider>
+        <div className="min-h-screen flex flex-col">
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </div>
+      </ImageStoreProvider>
+    </AuthProvider>
   );
 }

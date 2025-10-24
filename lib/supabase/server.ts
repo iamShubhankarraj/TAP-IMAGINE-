@@ -8,3 +8,6 @@ export const createSupabaseServerClient = () => {
     cookies: () => cookieStore,
   });
 };
+
+// Export a singleton instance for consistency
+export const supabaseServer = createSupabaseServerClient();

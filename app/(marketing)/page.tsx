@@ -13,10 +13,10 @@ export default function LandingPage() {
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Button asChild variant="ghost">
-            <Link href="/auth/login">Login</Link>
+            <Link href="/auth?mode=login">Login</Link>
           </Button>
           <Button asChild>
-            <Link href="/auth/signup">Get Started</Link>
+            <Link href="/auth?mode=signup">Get Started</Link>
           </Button>
         </nav>
       </header>
@@ -35,7 +35,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button asChild size="lg">
-                    <Link href="/auth/signup">Get Started for Free</Link>
+                    <Link href="/auth?mode=signup">Get Started for Free</Link>
                   </Button>
                 </div>
               </div>
@@ -101,7 +101,7 @@ export default function LandingPage() {
             </div>
             <div className="mx-auto w-full max-w-sm space-x-2">
               <Button asChild size="lg">
-                <Link href="/auth/signup">Sign Up for Free</Link>
+                <Link href="/auth?mode=signup">Sign Up for Free</Link>
               </Button>
             </div>
           </div>

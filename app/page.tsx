@@ -163,7 +163,7 @@ export default function HomePage() {
               isVisible['cta-buttons'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             }`}
           >
-            <Link href="/auth/signup" className="group relative">
+            <Link href="/auth?mode=signup" className="group relative">
               {/* Animated Glow */}
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-2xl blur-xl opacity-50 group-hover:opacity-100 transition duration-500 animate-gradient-x" />
               
@@ -509,7 +509,7 @@ export default function HomePage() {
                 
                 {/* CTA Button */}
                 <div className="inline-flex flex-col items-center gap-8">
-                  <Link href="/auth/signup" className="group/cta relative">
+                  <Link href="/auth?mode=signup" className="group/cta relative">
                     {/* Button Glow */}
                     <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-2xl blur-xl opacity-50 group-hover/cta:opacity-100 transition duration-500 animate-gradient-x" />
                     

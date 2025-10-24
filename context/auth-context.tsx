@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Types for profile data
 type ProfileData = {
@@ -38,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Initialize Supabase client with auth helpers
+  const supabase = createClientComponentClient();
 
   // Fetch user profile from Supabase (non-blocking - app works without profiles table)
   const fetchProfile = async (userId: string) => {
@@ -51,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         // Profiles table doesn't exist or no row for user - this is OK
         // The app will work fine without profile data
-        console.log('Profile not found (this is OK):', error.message);
         return null;
       }
       
@@ -71,57 +73,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state on component mount
   useEffect(() => {
+    let mounted = true;
+    
     const initializeAuth = async () => {
-      setIsLoading(true);
-      
-      // Get session and user
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      
-      if (currentSession?.user) {
-        setUser(currentSession.user);
-        const profileData = await fetchProfile(currentSession.user.id);
-        setProfile(profileData);
+      try {
+        // Get session and user
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        setSession(currentSession);
+        
+        if (currentSession?.user) {
+          setUser(currentSession.user);
+          const profileData = await fetchProfile(currentSession.user.id);
+          if (mounted) setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
 
     initializeAuth();
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      async (_event, newSession) => {
+        if (!mounted) return;
+        
         setSession(newSession);
         setUser(newSession?.user ?? null);
         
         if (newSession?.user) {
           const profileData = await fetchProfile(newSession.user.id);
-          setProfile(profileData);
+          if (mounted) setProfile(profileData);
         } else {
-          setProfile(null);
+          if (mounted) setProfile(null);
         }
         
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     );
 
     // Clean up subscription on unmount
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   // Sign up with email and password
   const signUp = async (
-    email: string, 
+    email: string,
     password: string,
     metadata?: { first_name?: string; last_name?: string; phone?: string }
   ) => {
     try {
       setIsLoading(true);
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -129,6 +141,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
+      
+      // If signup successful and user is created (no email confirmation required)
+      if (data.user && !error) {
+        // Create profile immediately
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              first_name: metadata?.first_name || null,
+              last_name: metadata?.last_name || null,
+              phone: metadata?.phone || null,
+              tier: 'free'
+            });
+          
+          if (profileError) {
+            console.error('Error creating profile during signup:', profileError);
+            // Don't fail the signup, just log the error
+          }
+        } catch (profileErr) {
+          console.error('Profile creation error during signup:', profileErr);
+          // Don't fail the signup, just log the error
+        }
+      }
       
       return { error };
     } catch (error) {
@@ -143,22 +180,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      console.log('🔐 Auth context: Starting login for', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) {
-        console.error('❌ Auth context: Login error:', error);
-      } else {
-        console.log('✅ Auth context: Login successful, session:', data.session ? 'Created' : 'None');
+      // If sign in successful, ensure profile exists
+      if (data.user && !error) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profileError && profileError.code === 'PGRST116') {
+            // Profile doesn't exist, create one
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: data.user.id,
+                email: data.user.email,
+                first_name: data.user.user_metadata?.first_name || null,
+                last_name: data.user.user_metadata?.last_name || null,
+                avatar_url: data.user.user_metadata?.avatar_url || null,
+                tier: 'free'
+              });
+
+            if (insertError) {
+              console.error('Error creating profile during signin:', insertError);
+            }
+          }
+        } catch (profileErr) {
+          console.error('Profile check error during signin:', profileErr);
+        }
       }
       
       return { error };
     } catch (error) {
-      console.error('❌ Auth context: Sign in exception:', error);
+      console.error('Sign in error:', error);
       return { error: error as Error };
     } finally {
       setIsLoading(false);

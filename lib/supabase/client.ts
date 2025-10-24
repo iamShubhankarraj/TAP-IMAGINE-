@@ -1,28 +1,20 @@
 // lib/supabase/client.ts
 
-import { createClient } from '@supabase/supabase-js';
-
-// Environment variables should be set in .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Validate environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    'Missing Supabase environment variables. Please check your .env.local file.'
+    'Missing Supabase environment variables. Please check your .env.local file.',
+    { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey }
   );
 }
 
-// Initialize the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    fetch: fetch.bind(globalThis),
-  },
-});
+// Initialize the Supabase client with auth helpers for consistency
+export const supabase = createClientComponentClient();
 
 // Export type for use in other files
 export type SupabaseClient = typeof supabase;

@@ -6,7 +6,6 @@ import { AuthProvider } from '@/context/auth-context';
 import { ImageStoreProvider } from '@/context/image-store';
 import { ExportQueueProvider } from '@/context/export-queue-context';
 import { EditorProvider } from '@/context/EditorContext';
-import Navbar from '@/components/layout/Navbar';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,7 +26,6 @@ export default function RootLayout({
           <ImageStoreProvider>
             <ExportQueueProvider>
               <EditorProvider>
-                <Navbar />
                 <main className="min-h-screen">
                   {children}
                 </main>
