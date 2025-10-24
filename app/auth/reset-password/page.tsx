@@ -1,8 +1,9 @@
 // app/auth/reset-password/page.tsx
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { X, Lock, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
@@ -15,7 +16,7 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   
   const router = useRouter();
-  const searchParams = useSearchParams();
+  
 
   // Check if we have a valid session from the reset link
   useEffect(() => {

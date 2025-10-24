@@ -1,9 +1,21 @@
+export const dynamic = 'force-dynamic';
+
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Wand2, ImageIcon, Bot } from 'lucide-react';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Force unauthenticated users to Sign In immediately after landing
+  const supabase = createSupabaseServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect('/auth?mode=login&redirect=/dashboard');
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="px-4 lg:px-6 h-14 flex items-center">
@@ -13,10 +25,10 @@ export default function LandingPage() {
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Button asChild variant="ghost">
-            <Link href="/auth?mode=login">Login</Link>
+            <Link href="/start">Login</Link>
           </Button>
           <Button asChild>
-            <Link href="/auth?mode=signup">Get Started</Link>
+            <Link href="/start">Get Started</Link>
           </Button>
         </nav>
       </header>
@@ -35,7 +47,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button asChild size="lg">
-                    <Link href="/auth?mode=signup">Get Started for Free</Link>
+                    <Link href="/start">Get Started for Free</Link>
                   </Button>
                 </div>
               </div>
@@ -101,7 +113,7 @@ export default function LandingPage() {
             </div>
             <div className="mx-auto w-full max-w-sm space-x-2">
               <Button asChild size="lg">
-                <Link href="/auth?mode=signup">Sign Up for Free</Link>
+                <Link href="/start">Sign Up for Free</Link>
               </Button>
             </div>
           </div>

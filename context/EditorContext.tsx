@@ -23,13 +23,6 @@ interface EditorContextType {
   currentFilter: string | null;
   setCurrentFilter: (filter: string | null) => void;
   
-  // History
-  history: ImageAdjustments[];
-  setHistory: (history: ImageAdjustments[]) => void;
-  
-  historyIndex: number;
-  setHistoryIndex: (index: number) => void;
-  
   // Current prompt
   prompt: string;
   setPrompt: (prompt: string) => void;
@@ -52,8 +45,6 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [referenceImages, setReferenceImages] = useState<StoredImage[]>([]);
   const [adjustments, setAdjustments] = useState<ImageAdjustments>(defaultAdjustments);
   const [currentFilter, setCurrentFilter] = useState<string | null>(null);
-  const [history, setHistory] = useState<ImageAdjustments[]>([defaultAdjustments]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   const [prompt, setPrompt] = useState('');
 
   const getDisplayImage = () => {
@@ -72,8 +63,6 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     setReferenceImages([]);
     setAdjustments(defaultAdjustments);
     setCurrentFilter(null);
-    setHistory([defaultAdjustments]);
-    setHistoryIndex(0);
     setPrompt('');
   };
 
@@ -90,10 +79,6 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         setAdjustments,
         currentFilter,
         setCurrentFilter,
-        history,
-        setHistory,
-        historyIndex,
-        setHistoryIndex,
         prompt,
         setPrompt,
         getDisplayImage,

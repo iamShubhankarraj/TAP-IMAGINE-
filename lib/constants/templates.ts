@@ -1,24 +1,20 @@
 // lib/constants/templates.ts
-import { Template } from '@/types/editor';
+import { TemplateData, TemplateCategory } from '@/types/templates';
 import templatesConfig from '@/config/templates.json';
 
-export const TEMPLATES: Template[] = templatesConfig.templates.map(t => ({
-  ...t,
-  promptTemplate: t.prompt,
-  thumbnailUrl: t.thumbnail,
-  isActive: true,
-}));
+// Export templates using the TemplateData shape expected by UI components
+export const TEMPLATES: TemplateData[] = templatesConfig.templates as TemplateData[];
 
-export const getTemplatesByCategory = (category: string) => {
+export const getTemplatesByCategory = (category: TemplateCategory): TemplateData[] => {
   if (category === 'all') return TEMPLATES;
   return TEMPLATES.filter(t => t.category === category);
 };
 
-export const getTemplateById = (id: string) => {
+export const getTemplateById = (id: string): TemplateData | undefined => {
   return TEMPLATES.find(t => t.id === id);
 };
 
-export const TEMPLATE_CATEGORIES = [
+export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string; icon: string }[] = [
   { id: 'all', label: 'All Templates', icon: '🎨' },
   { id: 'portrait', label: 'Portrait', icon: '👤' },
   { id: 'style', label: 'Style', icon: '✨' },

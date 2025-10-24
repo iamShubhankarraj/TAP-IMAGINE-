@@ -6,6 +6,7 @@ import { AuthProvider } from '@/context/auth-context';
 import { ImageStoreProvider } from '@/context/image-store';
 import { ExportQueueProvider } from '@/context/export-queue-context';
 import { EditorProvider } from '@/context/EditorContext';
+import { HistoryProvider } from '@/context/history-context';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,15 +24,17 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800`}>
         <AuthProvider>
-          <ImageStoreProvider>
-            <ExportQueueProvider>
-              <EditorProvider>
-                <main className="min-h-screen">
-                  {children}
-                </main>
-              </EditorProvider>
-            </ExportQueueProvider>
-          </ImageStoreProvider>
+          <HistoryProvider>
+            <ImageStoreProvider>
+              <ExportQueueProvider>
+                <EditorProvider>
+                  <main className="min-h-screen">
+                    {children}
+                  </main>
+                </EditorProvider>
+              </ExportQueueProvider>
+            </ImageStoreProvider>
+          </HistoryProvider>
         </AuthProvider>
       </body>
     </html>
