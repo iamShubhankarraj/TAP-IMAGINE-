@@ -534,7 +534,7 @@ export default function LegacyLoginRedirect() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Preserve any incoming redirect param from /auth/login?redirect=/editor ...
+    // Preserve any incoming redirect param from /auth?mode=login/auth/login?redirect=redirect=/editor ...
     const redirect = searchParams.get('redirect');
     const dest =
       redirect && redirect.startsWith('/')
@@ -1091,8 +1091,8 @@ export async function middleware(req: NextRequest) {
   }
 
   // Handle legacy auth routes (/auth/login, /auth/signup)
-  if (pathname === '/auth/login' || pathname === '/auth/signup') {
-    const mode = pathname === '/auth/login' ? 'login' : 'signup';
+  if (pathname === '/auth?mode=login' || pathname === '/auth?mode=signup') {
+    const mode = pathname === '/auth?mode=login' ? 'login' : 'signup';
     const redirectUrl = new URL('/auth', req.url);
     redirectUrl.searchParams.set('mode', mode);
     

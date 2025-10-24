@@ -32,7 +32,7 @@ export default function DashboardPage() {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      router.push('/auth/login');
+      router.push('/auth?mode=login');
       return;
     }
 
@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.push('/auth/login');
+    router.push('/auth?mode=login');
   }
 
   if (loading) {

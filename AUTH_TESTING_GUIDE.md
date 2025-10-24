@@ -85,7 +85,7 @@ Logs in but doesn't redirect:
    - http://localhost:3000/dashboard
 
 ### Expected Result:
-- ✅ Redirected to `/auth/login?redirect=/editor` (or `/dashboard`)
+- ✅ Redirected to `/auth?mode=login/auth/login?redirect=redirect=/editor` (or `/dashboard`)
 - ✅ After login, automatically sent to the page you wanted
 
 ### Steps:

@@ -147,13 +147,13 @@ export default function Navbar() {
             ) : (
               <div className="flex items-center space-x-3">
                 <Link
-                  href="/auth/login"
+                  href="/auth?mode=login"
                   className="px-3 py-2 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
-                  href="/auth/signup"
+                  href="/auth?mode=signup"
                   className="px-4 py-2 rounded-full text-sm font-medium bg-banana text-gray-900 hover:bg-banana-light transition-colors"
                 >
                   Sign Up
@@ -226,14 +226,14 @@ export default function Navbar() {
             ) : (
               <div className="flex flex-col space-y-2 pt-2 pb-1">
                 <Link
-                  href="/auth/login"
+                  href="/auth?mode=login"
                   onClick={() => setIsMenuOpen(false)}
                   className="px-3 py-2 rounded-md text-center text-base font-medium text-white hover:bg-white/5 transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
-                  href="/auth/signup"
+                  href="/auth?mode=signup"
                   onClick={() => setIsMenuOpen(false)}
                   className="px-3 py-2 rounded-md text-center text-base font-medium bg-banana text-gray-900 hover:bg-banana-light transition-colors"
                 >

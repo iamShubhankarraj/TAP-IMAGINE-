@@ -143,7 +143,7 @@ export default function TestLoginPage() {
             </button>
             
             <a
-              href="/auth/login"
+              href="/auth?mode=login"
               className="block w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium rounded-lg transition-colors text-center"
             >
               Go to Regular Login

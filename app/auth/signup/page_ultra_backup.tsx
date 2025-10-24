@@ -90,7 +90,7 @@ export default function SignupPage() {
               We've sent a confirmation link to <strong>{email}</strong>. Click the link in the email to verify your account.
             </p>
             <Link 
-              href="/auth/login" 
+              href="/auth?mode=login" 
               className="inline-block px-8 py-4 bg-gradient-to-r from-banana to-yellow-400 text-gray-900 font-black text-lg rounded-xl hover:shadow-2xl hover:shadow-banana/50 transition-all duration-300 transform hover:scale-105"
             >
               Continue to Sign In
@@ -230,7 +230,7 @@ export default function SignupPage() {
           {/* Sign in link */}
           <p className="text-center text-white/80 text-sm mt-8">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-banana hover:text-yellow-300 font-bold transition-colors">
+            <Link href="/auth?mode=login" className="text-banana hover:text-yellow-300 font-bold transition-colors">
               Sign in
             </Link>
           </p>

@@ -61,9 +61,9 @@ useEffect(() => {
 
 You're seeing this in terminal:
 ```
-GET /auth/login?redirect=%2Fdashboard 200 in 30ms
-GET /auth/login?redirect=%2Fdashboard 200 in 31ms
-GET /auth/login?redirect=%2Fdashboard 200 in 32ms
+GET /auth?mode=login/auth/login?redirect=redirect=%2Fdashboard 200 in 30ms
+GET /auth?mode=login/auth/login?redirect=redirect=%2Fdashboard 200 in 31ms
+GET /auth?mode=login/auth/login?redirect=redirect=%2Fdashboard 200 in 32ms
 // ... repeating hundreds of times
 ```
 

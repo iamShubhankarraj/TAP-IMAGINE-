@@ -110,7 +110,7 @@ Current compilation output shows:
 ✓ Compiled /middleware in 641ms (251 modules)
 ✓ Compiled /auth/login in 2.7s (851 modules)
 ✓ Compiled in 397ms (351 modules)
-GET /auth/login?redirect=%2Fdashboard 200 in 8ms
+GET /auth?mode=login/auth/login?redirect=redirect=%2Fdashboard 200 in 8ms
 ```
 
 **All pages working!** ✅

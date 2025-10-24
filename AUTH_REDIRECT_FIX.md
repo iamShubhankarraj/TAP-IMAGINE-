@@ -125,7 +125,7 @@ setTimeout(() => {
 
 ### Test Case 2: Protected Route Access
 1. While logged out, go to http://localhost:3000/editor
-2. Middleware redirects to `/auth/login?redirect=/editor`
+2. Middleware redirects to `/auth?mode=login/auth/login?redirect=redirect=/editor`
 3. Enter credentials and login
 4. ✅ Should redirect to `/editor` (not dashboard!)
 

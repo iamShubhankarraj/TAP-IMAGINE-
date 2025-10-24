@@ -51,7 +51,7 @@ export default function DashboardPage() {
         
         if (error || !session) {
           console.log('No session found, redirecting to login');
-          router.push('/auth/login?redirect=/dashboard');
+          router.push('/auth?mode=login/auth/login?redirect=redirect=/dashboard');
           return;
         }
         
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         }
       } catch (err) {
         console.error('Auth check error:', err);
-        router.push('/auth/login?redirect=/dashboard');
+        router.push('/auth?mode=login/auth/login?redirect=redirect=/dashboard');
       } finally {
         setIsAuthLoading(false);
       }

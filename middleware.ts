@@ -12,6 +12,8 @@ export async function middleware(req: NextRequest) {
   const redirectDest = `${pathname}${search}`;
 
   const { data: { session } } = await supabase.auth.getSession();
+  const isSessionValid =
+    !!session && (!session.expires_at || session.expires_at * 1000 > Date.now());
 
   const isPublicHome = pathname === '/';
   const isAuthRoute = pathname.startsWith('/auth');
@@ -26,7 +28,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // If user is authenticated and trying to access main auth page, redirect to dashboard
-  if (session && isAuthRoute && pathname === '/auth') {
+  if (isSessionValid && isAuthRoute && pathname === '/auth') {
     // Check if there's a redirect parameter in the URL
     const urlParams = new URLSearchParams(search);
     const hasRedirect = urlParams.has('redirect');
@@ -38,28 +40,13 @@ export async function middleware(req: NextRequest) {
   }
 
   // Gate protected routes when unauthenticated
-  if (!session && isProtectedRoute) {
+  if (!isSessionValid && isProtectedRoute) {
     const redirectUrl = new URL('/auth', req.url);
     redirectUrl.searchParams.set('mode', 'login');
     redirectUrl.searchParams.set('redirect', redirectDest);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Handle legacy auth routes (/auth/login, /auth/signup)
-  if (pathname === '/auth/login' || pathname === '/auth/signup') {
-    const mode = pathname === '/auth/login' ? 'login' : 'signup';
-    const redirectUrl = new URL('/auth', req.url);
-    redirectUrl.searchParams.set('mode', mode);
-    
-    // Preserve any existing redirect parameter
-    const urlParams = new URLSearchParams(search);
-    const existingRedirect = urlParams.get('redirect');
-    if (existingRedirect) {
-      redirectUrl.searchParams.set('redirect', existingRedirect);
-    }
-    
-    return NextResponse.redirect(redirectUrl);
-  }
 
   // For authenticated users accessing the home page, let them stay there
   // (not auto-redirecting to dashboard as per requirement)
