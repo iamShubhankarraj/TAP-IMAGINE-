@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { 
   Menu, X, User, LogOut, ChevronDown, 
@@ -13,6 +13,7 @@ import {
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -132,9 +133,10 @@ export default function Navbar() {
                       </Link>
                       <div className="border-t border-white/10 my-1"></div>
                       <button
-                        onClick={() => {
-                          signOut();
+                        onClick={async () => {
+                          await signOut();
                           setUserMenuOpen(false);
+                          router.replace('/auth?mode=login');
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors"
                       >
@@ -147,13 +149,13 @@ export default function Navbar() {
             ) : (
               <div className="flex items-center space-x-3">
                 <Link
-                  href="/auth?mode=login"
+                  href="/start"
                   className="px-3 py-2 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
-                  href="/auth?mode=signup"
+                  href="/start"
                   className="px-4 py-2 rounded-full text-sm font-medium bg-banana text-gray-900 hover:bg-banana-light transition-colors"
                 >
                   Sign Up
@@ -213,9 +215,10 @@ export default function Navbar() {
                   Settings
                 </Link>
                 <button
-                  onClick={() => {
-                    signOut();
+                  onClick={async () => {
+                    await signOut();
                     setIsMenuOpen(false);
+                    router.replace('/auth?mode=login');
                   }}
                   className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-400 hover:bg-white/5"
                 >
@@ -226,14 +229,14 @@ export default function Navbar() {
             ) : (
               <div className="flex flex-col space-y-2 pt-2 pb-1">
                 <Link
-                  href="/auth?mode=login"
+                  href="/start"
                   onClick={() => setIsMenuOpen(false)}
                   className="px-3 py-2 rounded-md text-center text-base font-medium text-white hover:bg-white/5 transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
-                  href="/auth?mode=signup"
+                  href="/start"
                   onClick={() => setIsMenuOpen(false)}
                   className="px-3 py-2 rounded-md text-center text-base font-medium bg-banana text-gray-900 hover:bg-banana-light transition-colors"
                 >

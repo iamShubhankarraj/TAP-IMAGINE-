@@ -56,9 +56,13 @@ export default function FeaturesPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   
-  const categories: Category[] = featuresConfig.categories;
-  const features: Feature[] = featuresConfig.features;
-  const comparisons: Comparison[] = carouselData.comparisons;
+  const categories: Category[] = featuresConfig.categories as Category[];
+  const rawFeatures = featuresConfig.features as Array<Omit<Feature, 'status'> & { status: string }>;
+  const features: Feature[] = rawFeatures.map((f) => ({
+    ...f,
+    status: f.status === 'current' || f.status === 'coming-soon' ? f.status : 'coming-soon',
+  }));
+  const comparisons: Comparison[] = carouselData.comparisons as Comparison[];
 
   // Filter features
   const filteredFeatures = features.filter(feature => {

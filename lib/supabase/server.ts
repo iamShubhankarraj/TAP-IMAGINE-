@@ -9,5 +9,4 @@ export const createSupabaseServerClient = () => {
   });
 };
 
-// Export a singleton instance for consistency
-export const supabaseServer = createSupabaseServerClient();
+// Avoid creating a module-level singleton here; calling cookies() at module scope breaks Next.js build time.

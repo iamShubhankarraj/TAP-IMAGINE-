@@ -42,11 +42,19 @@ export async function middleware(req: NextRequest) {
   // Gate protected routes when unauthenticated
   if (!isSessionValid && isProtectedRoute) {
     const redirectUrl = new URL('/auth', req.url);
-    redirectUrl.searchParams.set('mode', 'login');
+    redirectUrl.searchParams.set('mode', 'signup');
     redirectUrl.searchParams.set('redirect', redirectDest);
     return NextResponse.redirect(redirectUrl);
   }
 
+
+  // If unauthenticated and landing page, redirect to Sign In first
+  if (!isSessionValid && isPublicHome) {
+    const redirectUrl = new URL('/auth', req.url);
+    redirectUrl.searchParams.set('mode', 'signup');
+    redirectUrl.searchParams.set('redirect', '/dashboard');
+    return NextResponse.redirect(redirectUrl);
+  }
 
   // For authenticated users accessing the home page, let them stay there
   // (not auto-redirecting to dashboard as per requirement)

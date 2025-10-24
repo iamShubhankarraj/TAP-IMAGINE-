@@ -117,9 +117,9 @@ export default function AdjustmentControls({ adjustments, onChange }: Adjustment
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         {activeTab === 'presets' && (
-          <PresetsPanel 
+          <PresetsPanel
             onApplyPreset={handlePresetApply}
-            currentPresetId={currentPresetId}
+            currentPresetId={currentPresetId ?? undefined}
           />
         )}
         {activeTab === 'core' && (
