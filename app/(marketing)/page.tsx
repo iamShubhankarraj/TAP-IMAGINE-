@@ -1,21 +1,8 @@
-export const dynamic = 'force-dynamic';
-
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Wand2, ImageIcon, Bot } from 'lucide-react';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export default async function LandingPage() {
-  // Force unauthenticated users to Sign In immediately after landing
-  const supabase = createSupabaseServerClient();
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect('/auth?mode=login&redirect=/dashboard');
-  }
-
+export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="px-4 lg:px-6 h-14 flex items-center">
