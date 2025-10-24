@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TAPIMAGINE</string>
+    <string name="title_activity_main">TAPIMAGINE</string>
+    <string name="package_name">com.tap.imagine</string>
+    <string name="custom_url_scheme">com.tap.imagine</string>
+</resources>
