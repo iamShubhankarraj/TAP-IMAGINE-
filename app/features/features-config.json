@@ -184,7 +184,7 @@
       "status": "current",
       "category": "collaboration",
       "icon": "Lock",
-      "deepLink": "/auth/signup",
+      "deepLink": "/auth?mode=signup",
       "highlights": [
         "Secure authentication",
         "Email verification",

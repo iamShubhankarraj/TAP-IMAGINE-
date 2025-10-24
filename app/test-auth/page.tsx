@@ -250,7 +250,7 @@ export default function TestAuthPage() {
               → Supabase Dashboard
             </a>
             <a 
-              href="/auth/login" 
+              href="/auth?mode=login" 
               className="block text-blue-400 hover:text-blue-300"
             >
               → Back to Login Page

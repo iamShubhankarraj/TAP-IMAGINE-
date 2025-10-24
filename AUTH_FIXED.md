@@ -81,7 +81,7 @@ Your authentication system has been completely overhauled and is now **fully fun
 - `/app` - Requires authentication
 
 **Redirect Logic**:
-- Not logged in + trying to access protected route → `/auth/login?redirect=/editor`
+- Not logged in + trying to access protected route → `/auth?mode=login/auth/login?redirect=redirect=/editor`
 - Logged in + trying to access auth pages → `/dashboard`
 
 ---
@@ -271,7 +271,7 @@ PROTECTED ROUTE ACCESS:
      │
      ├──► Logged In  → Allow access ✅
      │
-     └──► Logged Out → Redirect to /auth/login?redirect=/editor
+     └──► Logged Out → Redirect to /auth?mode=login/auth/login?redirect=redirect=/editor
                                       │
                                       ▼
                                   After login → /editor ✅

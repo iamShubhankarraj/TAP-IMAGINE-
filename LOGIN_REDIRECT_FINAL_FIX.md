@@ -171,7 +171,7 @@ Try these scenarios:
 
 ### ✅ Scenario 3: Protected Route Access
 - [ ] While logged out, try to access http://localhost:3000/editor
-- [ ] Middleware redirects to /auth/login?redirect=/editor
+- [ ] Middleware redirects to /auth?mode=login/auth/login?redirect=redirect=/editor
 - [ ] Login with credentials
 - [ ] Should redirect to /editor (not /dashboard!)
 

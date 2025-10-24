@@ -145,7 +145,7 @@ export default function DebugAuthPage() {
               <div className="space-y-3">
                 <p className="text-white/70">You are not logged in. Please login first:</p>
                 <a 
-                  href="/auth/login?redirect=/debug-auth"
+                  href="/auth?mode=loginhref="/auth?mode=login/auth/login?redirect=redirect=redirect=/debug-auth"
                   className="inline-block px-6 py-3 bg-banana text-gray-900 font-bold rounded-lg hover:bg-yellow-300 transition-colors"
                 >
                   Go to Login

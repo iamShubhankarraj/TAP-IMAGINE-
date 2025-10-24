@@ -128,7 +128,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ### 3. Test Protected Routes
 - Try accessing `/editor` without login
-- Should redirect to `/auth/login?redirect=/editor`
+- Should redirect to `/auth?mode=login/auth/login?redirect=redirect=/editor`
 - After login, should go to `/editor`
 
 ### 4. Test UI/UX
