@@ -1,14 +1,14 @@
 // app/editor/EditorClientPage.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEditor } from '@/context/EditorContext';
 import {
   Upload, Sparkles, Sliders, Download, Image as ImageIcon,
   Grid, ChevronLeft, ChevronRight, Undo, Redo, Save, Share2,
-  Maximize2, Camera, Scissors
+  Maximize2, Camera, Scissors, Plus, Home
 } from 'lucide-react';
 import { StoredImage } from '@/types/editor';
 import { TemplateData } from '@/types/templates';
@@ -16,6 +16,11 @@ import { ImageAdjustments } from '@/types/adjustments';
 import { generateImageWithGemini } from '@/services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
 import { useHistory, createAdjustmentsChangeOp, createStateSetterOp } from '@/context/history-context';
+
+// Supabase integration
+import { useAuth } from '@/context/auth-context';
+import { persistPrimaryImage, persistGeneratedImage, persistReferenceImage, appendProjectEvent } from '@/services/project-service';
+import { buildLocalProjectSnapshot, saveLocalProject, appendLocalProjectEvent, listLocalProjects } from '@/services/local-projects';
 
 // Components
 import ImageUploader from '@/components/editor/upload/ImageUploader';
@@ -50,8 +55,11 @@ export default function EditorClientPage() {
     setCurrentFilter,
     prompt,
     setPrompt,
+    projectId,
+    setProjectId,
     getDisplayImage,
     getImageForProcessing,
+    resetEditor,
   } = useEditor();
   
   // Local state
@@ -61,7 +69,8 @@ export default function EditorClientPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { push, undo, redo, isUndoAvailable, isRedoAvailable } = useHistory();
+  const { push, undo, redo, isUndoAvailable, isRedoAvailable, clear } = useHistory();
+  const { user } = useAuth();
   
   // Lasso selection state
   const [showLassoTool, setShowLassoTool] = useState(false);
@@ -120,6 +129,35 @@ export default function EditorClientPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [undo, redo]);
 
+  // Initialize project from query param
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const pid = searchParams.get('project');
+    if (pid) {
+      setProjectId(pid);
+    }
+  }, [searchParams, setProjectId]);
+
+  // Hydrate from local snapshot if ?local=<id>
+  useEffect(() => {
+    const localId = searchParams.get('local');
+    if (!localId) return;
+    try {
+      const snap = listLocalProjects().find(p => p.id === localId);
+      if (snap) {
+        if (snap.primaryImage) setPrimaryImage(snap.primaryImage);
+        if (snap.generatedImage) setGeneratedImage(snap.generatedImage);
+        setReferenceImages(snap.referenceImages || []);
+        setPrompt(snap.prompt || '');
+        if (snap.adjustments) setAdjustments(snap.adjustments);
+        if (snap.filter) setCurrentFilter(snap.filter);
+        setActiveTab(snap.primaryImage ? 'prompt' : 'upload');
+      }
+    } catch (e) {
+      console.warn('Failed to hydrate from local project:', e);
+    }
+  }, [searchParams, setPrimaryImage, setGeneratedImage, setReferenceImages, setPrompt, setAdjustments, setCurrentFilter]);
+
   // History-aware setters
   const applyAdjustments = (next: ImageAdjustments, label?: string) => {
     const prev = adjustments;
@@ -138,7 +176,7 @@ export default function EditorClientPage() {
   };
 
   // Handlers
-  const handlePrimaryImageUpload = (image: StoredImage) => {
+  const handlePrimaryImageUpload = async (image: StoredImage) => {
     const prev = primaryImage;
     const applyFn = () => setPrimaryImage(image);
     const undoFn = () => setPrimaryImage(prev);
@@ -146,10 +184,30 @@ export default function EditorClientPage() {
     applyFn();
     push(createStateSetterOp('Set Primary Image', 'set_primary_image', applyFn, undoFn, { prev: prev?.url, next: image?.url }, ['images']));
     setActiveTab('prompt');
+
+    // Persist to Supabase storage if we have auth+project
+    try {
+      if (user?.id && projectId && image.url.startsWith('data:')) {
+        await persistPrimaryImage(image.url, user.id, projectId);
+        await appendProjectEvent(projectId, { type: 'upload_primary', url: image.url, meta: { name: image.name, size: image.size } });
+      }
+    } catch (e) {
+      console.warn('Primary image persist failed:', e);
+    }
   };
 
-  const handleReferenceImageUpload = (image: StoredImage) => {
+  const handleReferenceImageUpload = async (image: StoredImage) => {
     setReferenceImages([...referenceImages, image]);
+
+    // Persist to Supabase storage if available
+    try {
+      if (user?.id && projectId && image.url.startsWith('data:')) {
+        await persistReferenceImage(image.url, user.id, projectId, `${image.id}.png`);
+        await appendProjectEvent(projectId, { type: 'upload_reference', url: image.url, meta: { name: image.name, size: image.size } });
+      }
+    } catch (e) {
+      console.warn('Reference image persist failed:', e);
+    }
   };
 
   const handleTemplateSelect = async (template: TemplateData) => {
@@ -201,6 +259,16 @@ export default function EditorClientPage() {
         const undoFn = () => setGeneratedImage(prev);
         applyFn();
         push(createStateSetterOp('Image Generation', 'image_generation', applyFn, undoFn, { prev: prev?.url, next: nextImg.url, prompt: inputPrompt }, ['ai', 'generation']));
+
+        // Persist generated image to Supabase storage (keep local base64 for processing)
+        try {
+          if (user?.id && projectId && nextImg.url.startsWith('data:')) {
+            await persistGeneratedImage(nextImg.url, user.id, projectId, inputPrompt);
+          }
+        } catch (e) {
+          console.warn('Generated image persist failed:', e);
+        }
+
         setActiveTab('adjust');
       } else {
         setError(result.error || 'Failed to generate image');
@@ -211,6 +279,83 @@ export default function EditorClientPage() {
       setIsProcessing(false);
     }
   };
+
+     // Create a new project and save current project state to Supabase + local snapshot
+    const handleNewProject = async () => {
+      // Snapshot current state for local persistence and optional remote save
+      const prevPrimary = primaryImage;
+      const prevGenerated = generatedImage;
+      const prevReferences = [...referenceImages];
+      const prevPrompt = prompt;
+      const prevProjectId = projectId;
+      const prevAdjustments = adjustments;
+      const prevFilter = currentFilter;
+    
+      // Build and store a local "recent project" snapshot so it appears instantly on Dashboard
+      try {
+        const localId = `local-${uuidv4()}`;
+        const name = prevGenerated?.name || prevPrimary?.name || 'Untitled Local Project';
+        const snapshot = buildLocalProjectSnapshot({
+          id: localId,
+          name,
+          primaryImage: prevPrimary ?? null,
+          generatedImage: prevGenerated ?? null,
+          referenceImages: prevReferences,
+          prompt: prevPrompt ?? null,
+          adjustments: prevAdjustments ?? null,
+          filter: prevFilter ?? null,
+          events: [
+            { label: 'Saved locally before New Project', timestamp: Date.now(), action: 'save_before_new', payload: { projectId: prevProjectId } },
+          ],
+        });
+        saveLocalProject(snapshot);
+        appendLocalProjectEvent(localId, { label: 'New Project click', timestamp: Date.now(), action: 'click_new_project' });
+      } catch (e) {
+        console.warn('Local snapshot save failed:', e);
+      }
+    
+      // Immediately clear editor state so canvas disappears at click time
+      resetEditor();
+      setShowLassoTool(false);
+      setShowSketchTool(false);
+      setSelectionData(null);
+      setActiveTab('upload'); // Force Upload tab
+      setIsSidebarCollapsed(false);
+      setError(null);
+      clear(); // Clear history stacks to prevent undo bringing back old canvas
+    
+      try {
+        // Best-effort remote persistence of previous artifacts (non-blocking for UI freshness)
+        if (user?.id && prevProjectId) {
+          if (prevPrimary?.url?.startsWith('data:')) {
+            await persistPrimaryImage(prevPrimary.url, user.id, prevProjectId);
+          }
+          if (prevGenerated?.url?.startsWith('data:')) {
+            await persistGeneratedImage(prevGenerated.url, user.id, prevProjectId, prevPrompt);
+          }
+          for (const ref of prevReferences) {
+            if (ref.url.startsWith('data:')) {
+              await persistReferenceImage(ref.url, user.id, prevProjectId, `${ref.id}.png`);
+            }
+          }
+          await appendProjectEvent(prevProjectId, { type: 'update', prompt: prevPrompt, meta: { action: 'save_before_new' } });
+        }
+    
+        // Create new project
+        const res = await fetch('/api/projects/new', { method: 'POST' });
+        const json = await res.json();
+    
+        if (json?.id) {
+          setProjectId(json.id);
+          router.push(`/editor?project=${json.id}`);
+        } else {
+          setError('Failed to create new project');
+        }
+      } catch (err) {
+        console.error('handleNewProject error:', err);
+        setError('Failed to create new project');
+      }
+    };
 
   const handleExport = () => {
     if (!generatedImage && !primaryImage) {
@@ -334,13 +479,94 @@ export default function EditorClientPage() {
 
   const displayImage = getDisplayImage();
 
+  // Layout constants for fixed sidebar/canvas
+  const HEADER_HEIGHT = 64; // h-16
+  const SIDEBAR_WIDTH = 380; // px
+  const TOGGLE_COLLAPSED_GUTTER = 60; // px reserve for toggle visibility
+
+  const sidebarStyle: CSSProperties = {
+    position: 'fixed',
+    left: 0,
+    top: HEADER_HEIGHT,
+    height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+    width: SIDEBAR_WIDTH,
+    transform: isSidebarCollapsed ? `translateX(-${SIDEBAR_WIDTH}px)` : 'translateX(0)',
+    transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+  };
+
+  const canvasStyle: CSSProperties = {
+    position: 'fixed',
+    right: 0,
+    top: HEADER_HEIGHT,
+    height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+    left: isSidebarCollapsed ? TOGGLE_COLLAPSED_GUTTER : SIDEBAR_WIDTH,
+    transition: 'left 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+  };
+
+  const toggleLeft = isSidebarCollapsed ? 0 : SIDEBAR_WIDTH;
+
+  // Draggable Floating Action Buttons (Lasso and Sketch)
+  const [lassoFabPos, setLassoFabPos] = useState<{ x: number; y: number }>({
+    x: SIDEBAR_WIDTH + 20,
+    y: HEADER_HEIGHT + 100
+  });
+  const [sketchFabPos, setSketchFabPos] = useState<{ x: number; y: number }>({
+    x: SIDEBAR_WIDTH + 80,
+    y: HEADER_HEIGHT + 100
+  });
+  const [draggingFab, setDraggingFab] = useState<'lasso' | 'sketch' | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleFabMouseDown = (id: 'lasso' | 'sketch', e: React.MouseEvent) => {
+    e.preventDefault();
+    setDraggingFab(id);
+    const pos = id === 'lasso' ? lassoFabPos : sketchFabPos;
+    setDragOffset({ x: e.clientX - pos.x, y: e.clientY - pos.y });
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingFab) return;
+      const nextX = Math.min(Math.max(0, e.clientX - dragOffset.x), window.innerWidth - 64);
+      const nextY = Math.min(Math.max(HEADER_HEIGHT + 8, e.clientY - dragOffset.y), window.innerHeight - 64);
+      if (draggingFab === 'lasso') {
+        setLassoFabPos({ x: nextX, y: nextY });
+      } else {
+        setSketchFabPos({ x: nextX, y: nextY });
+      }
+    };
+    const onUp = () => setDraggingFab(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [draggingFab, dragOffset.x, dragOffset.y]);
+
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-[#0a0a0f] text-white">
-      {/* Premium Animated Background */}
+      {/* Premium Dotted Drawing Book Background */}
       <div className="fixed inset-0 z-0">
-        <div className="absolute top-0 -left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-purple-500/20 via-fuchsia-500/10 to-transparent rounded-full blur-[120px] animate-float" />
-        <div className="absolute -bottom-1/4 -right-1/4 w-[900px] h-[900px] bg-gradient-to-tr from-blue-500/20 via-cyan-500/10 to-transparent rounded-full blur-[120px] animate-float-delayed" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
+        {/* Soft gradient glows */}
+        <div className="absolute top-0 -left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-purple-500/15 via-fuchsia-500/10 to-transparent rounded-full blur-[140px] animate-float" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-[900px] h-[900px] bg-gradient-to-tr from-blue-500/15 via-cyan-500/10 to-transparent rounded-full blur-[140px] animate-float-delayed" />
+        {/* Dotted paper pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1.2px, transparent 1.2px)',
+            backgroundSize: '22px 22px'
+          }}
+        />
+        {/* Subtle paper grain */}
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, rgba(255,255,255,0.04) 0.5px, transparent 0.5px)',
+            backgroundSize: '100% 12px'
+          }}
+        />
       </div>
 
       {/* Loading Overlay */}
@@ -365,7 +591,7 @@ export default function EditorClientPage() {
           >
             <Undo className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
-          <button 
+          <button
             onClick={handleRedo}
             disabled={!isRedoAvailable}
             className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed"
@@ -379,7 +605,35 @@ export default function EditorClientPage() {
           <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 group" title="Share">
             <Share2 className="h-4 w-4 group-hover:scale-110 transition-transform" />
           </button>
-          <button 
+
+          {/* Back to Dashboard */}
+          <Link
+            href="/dashboard"
+            className="relative group/export ml-2 px-4 py-2.5 overflow-hidden rounded-xl"
+            title="Back to Dashboard"
+          >
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-white/10 to-white/20 rounded-xl blur opacity-50 group-hover/export:opacity-75 transition duration-200" />
+            <div className="relative flex items-center gap-2 px-2 py-0.5 bg-white/10 rounded-lg text-white font-semibold transform group-hover/export:scale-105 transition-all duration-200">
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </div>
+          </Link>
+
+          {/* New Project Button */}
+          <button
+            onClick={handleNewProject}
+            className="relative group/export ml-2 px-4 py-2.5 overflow-hidden rounded-xl"
+            title="New Project"
+          >
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-banana via-yellow-400 to-orange-400 rounded-xl blur opacity-50 group-hover/export:opacity-75 transition duration-200 animate-gradient-x" />
+            <div className="relative flex items-center gap-2 px-2 py-0.5 bg-gradient-to-r from-banana to-yellow-400 rounded-lg text-gray-900 font-semibold transform group-hover/export:scale-105 transition-all duration-200">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Project</span>
+            </div>
+          </button>
+
+          {/* Export Button */}
+          <button
             onClick={handleExport}
             className="relative group/export ml-2 px-4 py-2.5 overflow-hidden rounded-xl"
           >
@@ -393,22 +647,33 @@ export default function EditorClientPage() {
       </header>
       
       <div className="relative z-10 flex flex-1 overflow-hidden">
-        {/* Sidebar - Premium Glass */}
-        <aside 
-          className={`${
-            isSidebarCollapsed ? 'w-0' : 'w-80 lg:w-96'
-          } border-r border-white/10 backdrop-blur-xl bg-gradient-to-b from-white/5 via-white/10 to-white/5 flex flex-col transition-all duration-300 overflow-hidden relative shadow-2xl`}
+        {/* Sidebar Toggle - Fixed edge control */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className={`${isSidebarCollapsed ? 'rounded-r-2xl border-r-0' : 'rounded-l-2xl border-l-0'} fixed z-20 w-[44px] h-[100px] flex items-center justify-center shadow-xl border transition-all duration-300 hover:scale-105`}
+          style={{
+            left: toggleLeft,
+            top: `calc(${HEADER_HEIGHT}px + 50vh)`,
+            transform: 'translateY(-50%)',
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(30, 30, 45, 0.95)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+          }}
+          aria-label={isSidebarCollapsed ? 'Open sidebar' : 'Hide sidebar'}
+          title={isSidebarCollapsed ? 'Open sidebar' : 'Hide sidebar'}
         >
-          {/* Sidebar Toggle - Enhanced */}
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute -right-3 top-20 z-20 p-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20 hover:scale-110 transition-all duration-300 shadow-lg group"
-          >
-            {isSidebarCollapsed ? 
-              <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" /> : 
-              <ChevronLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-            }
-          </button>
+          {isSidebarCollapsed ? (
+            <ChevronRight className="h-5 w-5 text-gray-200" />
+          ) : (
+            <ChevronLeft className="h-5 w-5 text-gray-200" />
+          )}
+        </button>
+        {/* Sidebar - Premium Glass */}
+        <aside
+          className="rounded-3xl ring-1 ring-white/10 backdrop-blur-2xl bg-[rgba(20,20,30,0.75)] flex flex-col overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+          style={sidebarStyle}
+        >
+          {/* Toggle moved to fixed edge control */}
           
           {/* Tabs - Premium Glass Tabs */}
           <div className="flex border-b border-white/10 overflow-x-auto bg-white/5">
@@ -422,21 +687,37 @@ export default function EditorClientPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center justify-center py-3 px-4 flex-1 min-w-0 group ${
-                  activeTab === tab.id 
-                    ? 'bg-gradient-to-b from-white/15 to-white/10 border-b-2 border-banana shadow-lg' 
+                className={`relative group flex-1 min-w-0 py-3 px-2 flex items-center justify-center transition-all duration-300 ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-b from-white/15 to-white/10 border-b-2 border-banana shadow-lg'
                     : 'hover:bg-white/5'
-                } transition-all duration-300`}
+                }`}
+                aria-label={tab.label}
+                title={tab.label}
               >
-                {activeTab === tab.id && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-banana/10 to-transparent" />
-                )}
-                <tab.icon className={`h-5 w-5 mr-2 flex-shrink-0 ${
-                  activeTab === tab.id ? 'text-banana' : 'text-white/60 group-hover:text-white'
-                } transition-colors`} />
-                <span className={`text-sm truncate ${
-                  activeTab === tab.id ? 'text-white font-semibold' : 'text-white/70'
-                }`}>{tab.label}</span>
+                <div className="flex flex-col items-center justify-center">
+                  <div className="relative">
+                    {activeTab === tab.id && (
+                      <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-banana/20 via-yellow-400/10 to-orange-400/20 blur-md" />
+                    )}
+                    <div
+                      className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                        activeTab === tab.id
+                          ? 'bg-gradient-to-r from-banana to-yellow-400 text-gray-900 ring-2 ring-yellow-300/40 shadow-[0_6px_20px_rgba(251,191,36,0.35)] scale-105'
+                          : 'bg-white/10 text-white/70 ring-1 ring-white/10 group-hover:bg-white/15 group-hover:text-white'
+                      }`}
+                    >
+                      <tab.icon className={`h-5 w-5 ${activeTab === tab.id ? 'text-gray-900' : 'text-white/70'}`} />
+                    </div>
+                  </div>
+                  <span
+                    className={`mt-2 text-[11px] tracking-wide ${
+                      activeTab === tab.id ? 'text-white font-semibold' : 'text-white/70'
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
@@ -511,7 +792,7 @@ export default function EditorClientPage() {
         </aside>
         
         {/* Main Canvas - Premium Glass Container */}
-        <main className="flex-1 overflow-hidden relative">
+        <main className="overflow-hidden rounded-3xl ring-1 ring-white/10 bg-black/20 backdrop-blur-xl shadow-[0_30px_80px_rgba(0,0,0,0.55)]" style={canvasStyle}>
           {/* Premium Grid Background with Glow */}
           <div className="absolute inset-0">
             <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -543,17 +824,32 @@ export default function EditorClientPage() {
                   </div>
                 </div>
                 
-                {/* Floating Lasso Button */}
-                <FloatingLassoButton 
-                  onClick={handleLassoSelection}
-                  disabled={!displayImage}
-                />
+                {/* Draggable Floating Tools */}
+                <div
+                  className="fixed z-30 cursor-grab"
+                  style={{ left: lassoFabPos.x, top: lassoFabPos.y }}
+                  onMouseDown={(e) => handleFabMouseDown('lasso', e)}
+                  aria-label="Lasso Selection Tool"
+                  title="Lasso Selection Tool"
+                >
+                  <FloatingLassoButton
+                    onClick={handleLassoSelection}
+                    disabled={!displayImage}
+                  />
+                </div>
 
-                {/* Floating Sketch Button */}
-                <FloatingSketchButton 
-                  onClick={handleSketchTool}
-                  disabled={!displayImage}
-                />
+                <div
+                  className="fixed z-30 cursor-grab"
+                  style={{ left: sketchFabPos.x, top: sketchFabPos.y }}
+                  onMouseDown={(e) => handleFabMouseDown('sketch', e)}
+                  aria-label="Sketch Tool"
+                  title="Sketch Tool"
+                >
+                  <FloatingSketchButton
+                    onClick={handleSketchTool}
+                    disabled={!displayImage}
+                  />
+                </div>
               </div>
             ) : (
               <div className="text-center">

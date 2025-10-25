@@ -24,17 +24,28 @@ export default async function DashboardPage() {
     redirect('/auth?mode=signup&redirect=/dashboard');
   }
 
-  // Fetch profile server-side (best-effort; allow null)
+  // Ensure profile row exists and fetch it (map plan_type -> tier)
   let profile: Profile = null;
   try {
+    // Upsert minimal row to guarantee existence
+    await supabase
+      .from('profiles')
+      .upsert({ id: session.user.id }, { onConflict: 'id' });
+
     const { data, error } = await supabase
       .from('profiles')
-      .select('first_name, last_name, avatar_url, phone, tier')
+      .select('first_name, last_name, avatar_url, phone, plan_type')
       .eq('id', session.user.id)
       .single();
 
-    if (!error) {
-      profile = data as Profile;
+    if (!error && data) {
+      profile = {
+        first_name: (data as any).first_name ?? null,
+        last_name: (data as any).last_name ?? null,
+        avatar_url: (data as any).avatar_url ?? null,
+        phone: (data as any).phone ?? null,
+        tier: ((data as any).plan_type as 'free' | 'pro' | 'premium' | null) ?? null,
+      };
     }
   } catch {
     // ignore and keep profile null

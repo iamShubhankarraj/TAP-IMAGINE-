@@ -26,6 +26,10 @@ interface EditorContextType {
   // Current prompt
   prompt: string;
   setPrompt: (prompt: string) => void;
+
+  // Project tracking
+  projectId: string | null;
+  setProjectId: (id: string | null) => void;
   
   // Get display image (generated or primary)
   getDisplayImage: () => StoredImage | null;
@@ -46,6 +50,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [adjustments, setAdjustments] = useState<ImageAdjustments>(defaultAdjustments);
   const [currentFilter, setCurrentFilter] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   const getDisplayImage = () => {
     return generatedImage || primaryImage;
@@ -81,6 +86,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         setCurrentFilter,
         prompt,
         setPrompt,
+        projectId,
+        setProjectId,
         getDisplayImage,
         getImageForProcessing,
         resetEditor,

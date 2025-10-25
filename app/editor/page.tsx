@@ -37,24 +37,28 @@ export default async function EditorPage({ searchParams }: PageProps) {
       redirect(`/editor?project=${recent[0].id}`);
     }
 
-    const { data: created, error: createError } = await supabase
-      .from('projects')
-      .insert({
-        user_id: session.user.id,
-        name: 'Untitled Project',
-        data: {},
-        is_public: false,
-      })
-      .select('id')
-      .single();
+    try {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/projects/new`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ name: 'Untitled Project' }),
+      });
 
-    if (createError || !created) {
-      console.error('Failed to create project:', createError);
-      // As a safe fallback, continue to editor without project id
+      const json = await resp.json();
+
+      if (resp.ok && json?.id) {
+        redirect(`/editor?project=${json.id}`);
+      } else {
+        console.error('Failed to create project via API:', json?.details || json?.error || 'unknown_error');
+        // Safe fallback: continue to editor without project id
+        return <EditorClientPage />;
+      }
+    } catch (err) {
+      console.error('Failed to create project via API:', err);
+      // Safe fallback
       return <EditorClientPage />;
     }
-
-    redirect(`/editor?project=${created.id}`);
   }
 
   return <EditorClientPage />;
