@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const next = requestUrl.searchParams.get('next') || '/dashboard';
   const error = requestUrl.searchParams.get('error');
+  const intent = requestUrl.searchParams.get('intent') || 'login';
 
   if (error) {
     console.error('Auth error from callback:', error);
@@ -26,37 +27,60 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(`${requestUrl.origin}/auth?mode=login&error=${encodeURIComponent(error.message)}`);
       }
 
-      // Successfully authenticated, check if user needs profile creation
+      // Successfully authenticated, apply intent-based gating and profile handling
       if (data.user) {
         try {
-          // Check if profile exists
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('id')
+            .select('*')
             .eq('id', data.user.id)
             .single();
 
-          if (profileError && profileError.code === 'PGRST116') {
-            // Profile doesn't exist, create one
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: data.user.id,
-                email: data.user.email,
-                first_name: data.user.user_metadata?.first_name || null,
-                last_name: data.user.user_metadata?.last_name || null,
-                avatar_url: data.user.user_metadata?.avatar_url || null,
-                tier: 'free'
-              });
+          const origin = requestUrl.origin;
 
-            if (insertError) {
-              console.error('Error creating profile:', insertError);
-              // Don't fail the auth, just log the error
+          if (intent === 'login') {
+            // Require existing registered account for login with Google
+            if (profileError && profileError.code === 'PGRST116') {
+              await supabase.auth.signOut();
+              return NextResponse.redirect(`${origin}/auth?mode=signup&error=${encodeURIComponent('No account found for this Google user. Please sign up first.')}`);
+            }
+            // If schema includes is_registered flag and it's false, force sign-up
+            if ((profile as any)?.is_registered === false) {
+              await supabase.auth.signOut();
+              return NextResponse.redirect(`${origin}/auth?mode=signup&error=${encodeURIComponent('Please complete sign up first.')}`);
+            }
+          } else {
+            // intent === 'signup' -> ensure profile exists and mark registered
+            if (profileError && profileError.code === 'PGRST116') {
+              const { error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  email: data.user.email,
+                  first_name: data.user.user_metadata?.first_name || null,
+                  last_name: data.user.user_metadata?.last_name || null,
+                  avatar_url: data.user.user_metadata?.avatar_url || null,
+                  tier: 'free',
+                  is_registered: true,
+                });
+              if (insertError) {
+                console.error('Error creating profile:', insertError);
+              }
+            } else {
+              // Update registration flag if present
+              if ((profile as any) && (profile as any)?.is_registered === false) {
+                const { error: updateError } = await supabase
+                  .from('profiles')
+                  .update({ is_registered: true })
+                  .eq('id', data.user.id);
+                if (updateError) {
+                  console.error('Error updating profile registration flag:', updateError);
+                }
+              }
             }
           }
         } catch (profileErr) {
           console.error('Profile check error:', profileErr);
-          // Don't fail the auth, just log the error
         }
       }
     } catch (error) {

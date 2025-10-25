@@ -20,6 +20,13 @@ export default async function EditorPage({ searchParams }: PageProps) {
   const qp = sp?.project;
   let projectId = Array.isArray(qp) ? qp[0] : qp;
 
+  // Respect local editing: if ?local=<id> exists, bypass remote project resolution and render the client editor
+  const lp = sp?.local;
+  const localId = Array.isArray(lp) ? lp[0] : lp;
+  if (localId) {
+    return <EditorClientPage />;
+  }
+
   if (!projectId) {
     const { data: recent, error: recentError } = await supabase
       .from('projects')

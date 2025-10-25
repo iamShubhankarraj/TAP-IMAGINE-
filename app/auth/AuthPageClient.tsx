@@ -16,6 +16,8 @@ export default function AuthPageClient() {
   
   // Initialize Supabase client with auth helpers
   const supabase = createClientComponentClient();
+  // Base site URL for OAuth redirects; supports Vercel previews/custom domains
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
   const redirect = useMemo(() => searchParams.get('redirect') || '/dashboard', [searchParams]);
   const initialMode = (searchParams.get('mode') as Mode) || 'login';
@@ -44,6 +46,14 @@ export default function AuthPageClient() {
     }
   }, [user, authLoading, router, redirect]);
 
+  // Surface error messages coming via URL (e.g., gated Google login requires signup first)
+  useEffect(() => {
+    const errParam = searchParams.get('error');
+    if (errParam) {
+      setError(errParam);
+    }
+  }, [searchParams]);
+
   // Mouse parallax effect
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -55,6 +65,79 @@ export default function AuthPageClient() {
     window.addEventListener('mousemove', handler);
     return () => window.removeEventListener('mousemove', handler);
   }, []);
+
+  // Google OAuth Login
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const redirectUri = `${siteUrl}/auth/callback?next=${encodeURIComponent(redirect)}&intent=login`;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          // Optional: request refresh token and force consent for stable sessions
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      // In browsers, Supabase will typically auto-redirect.
+      // Fallback: navigate to the returned URL if provided.
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (ex: any) {
+      setError(ex?.message || 'Google sign-in failed');
+      setLoading(false);
+    }
+  };
+
+  // Google OAuth Signup
+  const handleGoogleSignup = async () => {
+    setLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const redirectUri = `${siteUrl}/auth/callback?next=${encodeURIComponent(redirect)}&intent=signup`;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (ex: any) {
+      setError(ex?.message || 'Google sign-up failed');
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +195,7 @@ export default function AuthPageClient() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirect)}`
+          emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(redirect)}&intent=signup`
         }
       });
 
@@ -125,6 +208,22 @@ export default function AuthPageClient() {
       if (data.session) {
         // Auto-logged in (if email confirmation disabled)
         setSuccessMessage('Account created successfully! Redirecting...');
+        try {
+          const userId =
+            (data as any)?.user?.id ||
+            (data as any)?.session?.user?.id ||
+            null;
+          if (userId) {
+            // Mark the profile as registered so future Google "login" is allowed
+            await supabase
+              .from('profiles')
+              .update({ is_registered: true })
+              .eq('id', userId);
+          }
+        } catch (regErr) {
+          console.error('Error marking profile as registered after signup:', regErr);
+          // do not block redirect
+        }
         setTimeout(() => {
           router.replace(redirect);
         }, 1000);
@@ -267,188 +366,248 @@ export default function AuthPageClient() {
 
               {/* Forms */}
               {mode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-5">
-                  {/* Email */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-white/90 mb-2.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative flex items-center">
-                        <Mail className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
-                          required
-                          autoComplete="email"
-                        />
+                <>
+                  {/* Social Sign-in */}
+                  <div className="space-y-5">
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={loading}
+                      className="group relative w-full"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-white/20 via-white/10 to-transparent rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-200" />
+                      <div className="relative flex items-center justify-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-xl font-bold text-base transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
+                        {/* Google 'G' logo SVG */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 48 48">
+                          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.7 4.9-6.4 8.5-11.8 8.5C16 36.5 9.5 30 9.5 22S16 7.5 24 7.5c3.3 0 6.3 1.2 8.6 3.2l5.6-5.6C34.7 1.8 29.6 0 24 0 10.8 0 0 10.8 0 24s10.8 24 24 24c13.2 0 24-10.8 24-24 0-1.5-.2-3-.4-4.5z"/>
+                          <path fill="#FF3D00" d="M0 24c0 6.5 2.5 12.4 6.5 16.8l6.1-4.9C9.2 33.7 7.5 29.1 7.5 24S9.2 14.3 12.6 11.1L6.5 6.2C2.5 11.6 0 17.5 0 24z"/>
+                          <path fill="#4CAF50" d="M24 48c6.5 0 12.4-2.5 16.8-6.5l-6.1-4.9C32.6 38.8 28.5 40.5 24 40.5c-5.4 0-10.1-3.6-12.1-8.6l-6.1 4.9C11.6 45.5 17.5 48 24 48z"/>
+                          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.9-3 5.4-5.6 7.1l6.1 4.9C39.5 37.3 43.5 31.4 43.6 24c0-1.5-.2-3-.4-4.5z"/>
+                        </svg>
+                        <span>Sign in with Google</span>
                       </div>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-white/10"></div>
+                      <span className="text-white/50 text-xs">or</span>
+                      <div className="h-px flex-1 bg-white/10"></div>
                     </div>
                   </div>
-                  {/* Password */}
-                  <div className="group">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <label className="text-sm font-semibold text-white/90">
+
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    {/* Email */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-white/90 mb-2.5">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative flex items-center">
+                          <Mail className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
+                            required
+                            autoComplete="email"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Password */}
+                    <div className="group">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <label className="text-sm font-semibold text-white/90">
+                          Password
+                        </label>
+                        <Link
+                          href="/auth/forgot-password"
+                          className="text-sm font-medium text-banana hover:text-yellow-300 transition-colors"
+                        >
+                          Forgot?
+                        </Link>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative flex items-center">
+                          <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
+                            required
+                            autoComplete="current-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 text-white/40 hover:text-white/60 transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="group relative w-full mt-6"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-200 animate-gradient-x" />
+                      <div className="relative flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-banana to-yellow-400 rounded-xl font-black text-lg text-gray-900 transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            <span>Signing In...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Sign In</span>
+                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  {/* Social Sign-up */}
+                  <div className="space-y-5">
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignup}
+                      disabled={loading}
+                      className="group relative w-full"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-white/20 via-white/10 to-transparent rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-200" />
+                      <div className="relative flex items-center justify-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-xl font-bold text-base transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
+                        {/* Google 'G' logo SVG */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 48 48">
+                          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.7 4.9-6.4 8.5-11.8 8.5C16 36.5 9.5 30 9.5 22S16 7.5 24 7.5c3.3 0 6.3 1.2 8.6 3.2l5.6-5.6C34.7 1.8 29.6 0 24 0 10.8 0 0 10.8 0 24s10.8 24 24 24c13.2 0 24-10.8 24-24 0-1.5-.2-3-.4-4.5z"/>
+                          <path fill="#FF3D00" d="M0 24c0 6.5 2.5 12.4 6.5 16.8l6.1-4.9C9.2 33.7 7.5 29.1 7.5 24S9.2 14.3 12.6 11.1L6.5 6.2C2.5 11.6 0 17.5 0 24z"/>
+                          <path fill="#4CAF50" d="M24 48c6.5 0 12.4-2.5 16.8-6.5l-6.1-4.9C32.6 38.8 28.5 40.5 24 40.5c-5.4 0-10.1-3.6-12.1-8.6l-6.1 4.9C11.6 45.5 17.5 48 24 48z"/>
+                          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.9-3 5.4-5.6 7.1l6.1 4.9C39.5 37.3 43.5 31.4 43.6 24c0-1.5-.2-3-.4-4.5z"/>
+                        </svg>
+                        <span>Sign up with Google</span>
+                      </div>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-white/10"></div>
+                      <span className="text-white/50 text-xs">or</span>
+                      <div className="h-px flex-1 bg-white/10"></div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSignup} className="space-y-5">
+                    {/* Email */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-white/90 mb-2.5">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative flex items-center">
+                          <Mail className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
+                            required
+                            autoComplete="email"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Password */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-white/90 mb-2.5">
                         Password
                       </label>
-                      <Link
-                        href="/auth/forgot-password"
-                        className="text-sm font-medium text-banana hover:text-yellow-300 transition-colors"
-                      >
-                        Forgot?
-                      </Link>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative flex items-center">
-                        <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
-                          required
-                          autoComplete="current-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 text-white/40 hover:text-white/60 transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative flex items-center">
+                          <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Choose a strong password"
+                            className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
+                            required
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 text-white/40 hover:text-white/60 transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="group relative w-full mt-6"
-                  >
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-200 animate-gradient-x" />
-                    <div className="relative flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-banana to-yellow-400 rounded-xl font-black text-lg text-gray-900 transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span>Signing In...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Sign In</span>
-                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </>
-                      )}
-                    </div>
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSignup} className="space-y-5">
-                  {/* Email */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-white/90 mb-2.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative flex items-center">
-                        <Mail className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
-                          required
-                          autoComplete="email"
-                        />
+                    {/* Confirm Password */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-white/90 mb-2.5">
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/20 to-orange-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative flex items-center">
+                          <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Re-enter your password"
+                            className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
+                            required
+                            autoComplete="new-password"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {/* Password */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-white/90 mb-2.5">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative flex items-center">
-                        <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Choose a strong password"
-                          className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
-                          required
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 text-white/40 hover:text-white/60 transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
+  
+                    {/* Submit */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="group relative w-full mt-6"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-200 animate-gradient-x" />
+                      <div className="relative flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-banana to-yellow-400 rounded-xl font-black text-lg text-gray-900 transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            <span>Creating account...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Create Account</span>
+                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                          </>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                  {/* Confirm Password */}
-                  <div className="group">
-                    <label className="block text-sm font-semibold text-white/90 mb-2.5">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-pink-500/20 to-orange-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative flex items-center">
-                        <Lock className="absolute left-4 w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
-                        <input
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Re-enter your password"
-                          className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 backdrop-blur-sm"
-                          required
-                          autoComplete="new-password"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="group relative w-full mt-6"
-                  >
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-200 animate-gradient-x" />
-                    <div className="relative flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-banana to-yellow-400 rounded-xl font-black text-lg text-gray-900 transform group-hover:scale-[1.02] transition-all duration-200 shadow-lg">
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span>Creating account...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Create Account</span>
-                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </>
-                      )}
-                    </div>
-                  </button>
-                </form>
+                    </button>
+                  </form>
+                </>
               )}
 
               {/* Back/Home Links */}

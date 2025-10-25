@@ -21,6 +21,35 @@ export type LocalProjectEvent = {
   payload?: Record<string, unknown> | null;
 };
 
+/**
+ * Detailed revision snapshot entry to record every iteration/edit for a local project.
+ */
+export type LocalProjectRevision = {
+  id: string; // uuid for revision entry
+  label: string; // human-friendly label
+  timestamp: number; // when this revision was recorded
+  type:
+    | 'initial_snapshot'
+    | 'set_primary_image'
+    | 'upload_reference'
+    | 'image_generation'
+    | 'sketch_generation'
+    | 'area_edit_generation'
+    | 'adjustments_change'
+    | 'filter_apply';
+  // Snapshot of editor state at this point
+  snapshot: {
+    primaryImage?: StoredImage | null;
+    generatedImage?: StoredImage | null;
+    referenceImages?: StoredImage[];
+    prompt?: string | null;
+    adjustments?: ImageAdjustments | null;
+    filter?: string | null;
+  };
+  // Optional extra metadata
+  payload?: Record<string, unknown> | null;
+};
+
 export type LocalProject = {
   // Local identity
   id: string; // e.g. 'local-<uuid>'
@@ -46,6 +75,9 @@ export type LocalProject = {
 
   // Activity log
   events?: LocalProjectEvent[];
+
+  // Complete iteration history (every edit/revision)
+  revisions?: LocalProjectRevision[];
 
   // Timestamps
   createdAt: string; // ISO string
@@ -172,6 +204,33 @@ export function appendLocalProjectEvent(id: string, event: LocalProjectEvent) {
 }
 
 /**
+ * Append a detailed revision snapshot to a local project.
+ * Use this to capture every iteration (generation, adjustments, filter, etc.).
+ */
+export function appendLocalProjectRevision(id: string, revision: LocalProjectRevision) {
+  const items = loadAllLocalProjects();
+  const idx = items.findIndex((p) => p.id === id);
+  if (idx === -1) return;
+
+  const prev = items[idx];
+  const revisions = Array.isArray(prev.revisions) ? prev.revisions : [];
+
+  items[idx] = {
+    ...prev,
+    revisions: [...revisions, revision],
+    // Keep thumbnail aligned to latest generated/primary if present in revision snapshot
+    thumbnailDataUrl:
+      revision.snapshot.generatedImage?.url ??
+      revision.snapshot.primaryImage?.url ??
+      prev.thumbnailDataUrl ??
+      null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveAllLocalProjects(items);
+}
+
+/**
  * Utility to create a LocalProject snapshot from current editor state.
  * Use this in the editor before resetting state on "New Project".
  */
@@ -192,6 +251,23 @@ export function buildLocalProjectSnapshot(params: {
     params.primaryImage?.url ||
     null;
 
+  // Seed with an initial revision capturing the current snapshot
+  const initialRevision: LocalProjectRevision = {
+    id: `${params.id}-rev-initial`,
+    label: 'Initial Snapshot',
+    timestamp: Date.now(),
+    type: 'initial_snapshot',
+    snapshot: {
+      primaryImage: params.primaryImage ?? null,
+      generatedImage: params.generatedImage ?? null,
+      referenceImages: params.referenceImages ?? [],
+      prompt: params.prompt ?? null,
+      adjustments: params.adjustments ?? null,
+      filter: params.filter ?? null,
+    },
+    payload: null,
+  };
+
   return {
     id: params.id,
     status: 'pending',
@@ -206,6 +282,7 @@ export function buildLocalProjectSnapshot(params: {
     adjustments: params.adjustments ?? null,
     filter: params.filter ?? null,
     events: params.events ?? [],
+    revisions: [initialRevision],
     createdAt: nowIso,
     updatedAt: nowIso,
   };

@@ -45,8 +45,8 @@ export async function POST(request: Request) {
       const insertPayload: Record<string, any> = {
         user_id: userId,
         name: name || 'Untitled Project',
-        primary_image_url: null,
-        generated_image_url: null,
+        primary_image_url: '',
+        generated_image_url: '',
         prompt: prompt ?? null,
         template_id: template_id ?? null,
       };
@@ -95,8 +95,8 @@ export async function POST(request: Request) {
     const insertPayload: Record<string, any> = {
       user_id: userId,
       name: name || 'Untitled Project',
-      primary_image_url: null,
-      generated_image_url: null,
+      primary_image_url: '',
+      generated_image_url: '',
       prompt: prompt ?? null,
       template_id: template_id ?? null,
     };

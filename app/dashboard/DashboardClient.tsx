@@ -22,9 +22,13 @@ import {
   Rocket,
   LogIn,
   Settings,
+  Pencil,
+  Check,
+  CloudUpload,
+  Trash
 } from 'lucide-react';
 import { persistPrimaryImage, persistGeneratedImage, persistReferenceImage } from '@/services/project-service';
-import { listLocalProjects, updateLocalProject, markLocalProjectSynced, appendLocalProjectEvent } from '@/services/local-projects';
+import { listLocalProjects, updateLocalProject, markLocalProjectSynced, appendLocalProjectEvent, removeLocalProject } from '@/services/local-projects';
 import type { LocalProject } from '@/services/local-projects';
 
 type User = {
@@ -76,6 +80,10 @@ export default function DashboardClient({ user, profile }: { user: User; profile
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+
+  // Inline rename state for recent projects
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
 
   // Derived tier (fallback to "free" if not present in profile)
   const tier: 'free' | 'pro' | 'premium' =
@@ -171,6 +179,72 @@ export default function DashboardClient({ user, profile }: { user: User; profile
     setLocalProjects(listLocalProjects());
   };
 
+  // Remote project: title edit
+  const handleRemoteTitleSave = async (projectId: string, name: string) => {
+    try {
+      const { error } = await supabase.from('projects').update({ name }).eq('id', projectId);
+      if (error) throw error;
+      await refreshRecentProjects();
+    } catch (err) {
+      console.error('Remote title update failed:', err);
+      setError('Failed to rename project');
+    }
+  };
+
+  const startEditName = (item: { id: string; name: string; kind: 'local' | 'remote' }) => {
+    setEditingId(item.id);
+    setEditingName(item.name || '');
+  };
+
+  const saveEditName = async (item: { id: string; kind: 'local' | 'remote' }) => {
+    if (!editingId) return;
+    if (!editingName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    if (item.kind === 'local') {
+      handleLocalTitleSave(item.id, editingName.trim());
+    } else {
+      await handleRemoteTitleSave(item.id, editingName.trim());
+    }
+    setEditingId(null);
+  };
+
+  const handleSyncLocalClick = async (localId: string) => {
+    const p = (localProjects || []).find(lp => lp.id === localId);
+    if (!p) return;
+    await syncSingleLocalProject(p);
+  };
+
+  // Delete a local recent project
+  const handleDeleteLocalProject = (localId: string) => {
+    if (!localId) return;
+    const ok = typeof window !== 'undefined' ? window.confirm('Delete this local project? This cannot be undone.') : true;
+    if (!ok) return;
+    try {
+      removeLocalProject(localId);
+      setLocalProjects(listLocalProjects());
+    } catch (err) {
+      console.error('Local project delete failed:', err);
+      setError('Failed to delete local project');
+    }
+  };
+
+  // Delete a remote recent project
+  const handleDeleteRemoteProject = async (projectId: string) => {
+    if (!projectId || !user?.id) return;
+    const ok = typeof window !== 'undefined' ? window.confirm('Delete this cloud project? This cannot be undone.') : true;
+    if (!ok) return;
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', projectId).eq('user_id', user.id);
+      if (error) throw error;
+      await refreshRecentProjects();
+    } catch (err) {
+      console.error('Remote project delete failed:', err);
+      setError('Failed to delete remote project');
+    }
+  };
+
   // Sync a single local project to Supabase immediately
   const syncSingleLocalProject = async (p: LocalProject) => {
     if (!user?.id) return;
@@ -189,17 +263,67 @@ export default function DashboardClient({ user, profile }: { user: User; profile
       }
       const remoteId = json.id as string;
 
-      // Upload images best-effort
-      if (p.primaryImage?.url?.startsWith('data:')) {
-        await persistPrimaryImage(p.primaryImage.url, user.id, remoteId);
+      // Upload images best-effort and capture public URLs
+      let primaryPublicUrl: string | null = null;
+      let generatedPublicUrl: string | null = null;
+
+      if (p.primaryImage?.url) {
+        if (p.primaryImage.url.startsWith('data:')) {
+          const { publicUrl } = await persistPrimaryImage(p.primaryImage.url, user.id, remoteId);
+          primaryPublicUrl = publicUrl || null;
+        } else if (p.primaryImage.url.startsWith('http')) {
+          // Already a URL (e.g., previously uploaded)
+          primaryPublicUrl = p.primaryImage.url;
+        }
       }
-      if (p.generatedImage?.url?.startsWith('data:')) {
-        await persistGeneratedImage(p.generatedImage.url, user.id, remoteId);
+
+      if (p.generatedImage?.url) {
+        if (p.generatedImage.url.startsWith('data:')) {
+          const { publicUrl } = await persistGeneratedImage(p.generatedImage.url, user.id, remoteId);
+          generatedPublicUrl = publicUrl || null;
+        } else if (p.generatedImage.url.startsWith('http')) {
+          generatedPublicUrl = p.generatedImage.url;
+        }
       }
+
       for (const ref of p.referenceImages || []) {
         if (ref.url?.startsWith('data:')) {
           await persistReferenceImage(ref.url, user.id, remoteId, `${ref.id}.png`);
         }
+      }
+
+      // Update Supabase row with editor state (prompt, adjustments, filter) and thumbnail
+      try {
+        const dataPayload: any = {
+          prompt: p.prompt ?? null,
+          adjustments: p.adjustments ?? null,
+          filter: p.filter ?? null,
+          local: {
+            id: p.id,
+            name: p.name,
+            revisions: Array.isArray(p.revisions) ? p.revisions.length : 0,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+          },
+          references: (p.referenceImages || []).map((r) => ({
+            id: r.id,
+            name: r.name,
+          })),
+        };
+
+        const { error: updateErr } = await supabase
+          .from('projects')
+          .update({
+            data: dataPayload,
+            thumbnail_url: generatedPublicUrl || primaryPublicUrl || null,
+          })
+          .eq('id', remoteId);
+
+        if (updateErr) {
+          console.warn('Supabase project data update failed:', updateErr);
+        }
+      } catch (e) {
+        console.warn('Project data update exception:', e);
       }
 
       // Mark local as synced and refresh local+remote lists
@@ -669,28 +793,78 @@ const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => 
                             </div>
                           )}
                         </div>
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="flex gap-2">
-                            <Link
-                              href={item.kind === 'local' ? `/editor?local=${item.id}` : `/editor?project=${item.id}`}
-                              className="px-4 py-2 rounded-xl bg-banana text-gray-900 font-bold hover:scale-105 transition"
+
+                        {/* Top-right controls: Sync, Rename, Delete */}
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                          {item.kind === 'local' && (
+                            <button
+                              onClick={() => handleSyncLocalClick(item.id)}
+                              className="p-2 rounded-lg bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 backdrop-blur transition disabled:opacity-50"
+                              title={isSyncingLocal ? 'Syncing...' : 'Sync to Cloud'}
+                              disabled={isSyncingLocal}
                             >
-                              Edit
-                            </Link>
-                          </div>
+                              <CloudUpload className="h-4 w-4 text-banana" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => startEditName(item)}
+                            className="p-2 rounded-lg bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 backdrop-blur transition"
+                            title="Rename Project"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              item.kind === 'local'
+                                ? handleDeleteLocalProject(item.id)
+                                : handleDeleteRemoteProject(item.id)
+                            }
+                            className="p-2 rounded-lg bg-black/40 hover:bg-black/60 border border-white/20 text-white/90 backdrop-blur transition"
+                            title="Delete Project"
+                          >
+                            <Trash className="h-4 w-4 text-red-400" />
+                          </button>
                         </div>
+
+                        {/* Inline rename overlay */}
+                        {editingId === item.id && (
+                          <div className="absolute top-2 left-2 right-20 z-10 flex items-center gap-2 bg-black/50 border border-white/20 rounded-lg px-2 py-1 backdrop-blur">
+                            <input
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/50"
+                              placeholder="Enter project name"
+                            />
+                            <button
+                              onClick={() => saveEditName(item)}
+                              className="p-2 rounded-md bg-banana text-gray-900 font-semibold hover:scale-105 transition"
+                              title="Save Name"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+
                         <div className="p-4">
                           <div className="flex items-center justify-between">
                             <h3 className="text-white font-medium truncate">{item.name}</h3>
-                            {item.kind === 'local' && (
-                              <span className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-white/70 text-xs">
-                                {item.status === 'pending'
-                                  ? 'Local • Pending Sync'
-                                  : item.status === 'failed'
-                                  ? 'Local • Failed'
-                                  : 'Local • Synced'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {item.kind === 'local' && (
+                                <span className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-white/70 text-xs">
+                                  {item.status === 'pending'
+                                    ? 'Local • Pending Sync'
+                                    : item.status === 'failed'
+                                    ? 'Local • Failed'
+                                    : 'Local • Synced'}
+                                </span>
+                              )}
+                              <Link
+                                href={item.kind === 'local' ? `/editor?local=${item.id}` : `/editor?project=${item.id}`}
+                                className="px-3 py-1 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition text-xs"
+                              >
+                                Edit
+                              </Link>
+                            </div>
                           </div>
                           <p className="text-white/60 text-sm">{item.date.toLocaleDateString()}</p>
                         </div>
@@ -718,19 +892,69 @@ const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => 
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-white font-medium truncate">{item.name}</h3>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {editingId === item.id ? (
+                              <>
+                                <input
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/50 border-b border-white/20"
+                                  placeholder="Enter project name"
+                                />
+                                <button
+                                  onClick={() => saveEditName(item)}
+                                  className="p-2 rounded-md bg-banana text-gray-900 font-semibold hover:scale-105 transition"
+                                  title="Save Name"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <h3 className="text-white font-medium truncate">{item.name}</h3>
+                                <button
+                                  onClick={() => startEditName(item)}
+                                  className="p-2 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition"
+                                  title="Rename Project"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                           {item.kind === 'local' && (
-                            <span className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-white/70 text-xs">
-                              {item.status === 'pending'
-                                ? 'Local • Pending Sync'
-                                : item.status === 'failed'
-                                ? 'Local • Failed'
-                                : 'Local • Synced'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-white/70 text-xs">
+                                {item.status === 'pending'
+                                  ? 'Local • Pending Sync'
+                                  : item.status === 'failed'
+                                  ? 'Local • Failed'
+                                  : 'Local • Synced'}
+                              </span>
+                              <button
+                                onClick={() => handleSyncLocalClick(item.id)}
+                                className="p-2 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition disabled:opacity-50"
+                                title={isSyncingLocal ? 'Syncing...' : 'Sync to Cloud'}
+                                disabled={isSyncingLocal}
+                              >
+                                <CloudUpload className="h-4 w-4 text-banana" />
+                              </button>
+                            </div>
                           )}
                         </div>
                         <p className="text-white/60 text-sm">{item.date.toLocaleDateString()}</p>
                       </div>
+                      <button
+                        onClick={() =>
+                          item.kind === 'local'
+                            ? handleDeleteLocalProject(item.id)
+                            : handleDeleteRemoteProject(item.id)
+                        }
+                        className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition"
+                        title="Delete Project"
+                      >
+                        <Trash className="h-4 w-4 text-red-400" />
+                      </button>
                       <Link
                         href={item.kind === 'local' ? `/editor?local=${item.id}` : `/editor?project=${item.id}`}
                         className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition"

@@ -4,6 +4,7 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import type React from 'react';
 import { useEditor } from '@/context/EditorContext';
 import {
   Upload, Sparkles, Sliders, Download, Image as ImageIcon,
@@ -19,8 +20,9 @@ import { useHistory, createAdjustmentsChangeOp, createStateSetterOp } from '@/co
 
 // Supabase integration
 import { useAuth } from '@/context/auth-context';
-import { persistPrimaryImage, persistGeneratedImage, persistReferenceImage, appendProjectEvent } from '@/services/project-service';
-import { buildLocalProjectSnapshot, saveLocalProject, appendLocalProjectEvent, listLocalProjects } from '@/services/local-projects';
+import { persistPrimaryImage, persistGeneratedImage, persistReferenceImage, appendProjectEvent, updateProject } from '@/services/project-service';
+import { buildLocalProjectSnapshot, saveLocalProject, appendLocalProjectEvent, listLocalProjects, appendLocalProjectRevision, updateLocalProject } from '@/services/local-projects';
+import type { LocalProjectRevision } from '@/services/local-projects';
 
 // Components
 import ImageUploader from '@/components/editor/upload/ImageUploader';
@@ -69,7 +71,7 @@ export default function EditorClientPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { push, undo, redo, isUndoAvailable, isRedoAvailable, clear } = useHistory();
+  const { push, undo, redo, isUndoAvailable, isRedoAvailable, clear, past } = useHistory();
   const { user } = useAuth();
   
   // Lasso selection state
@@ -83,6 +85,9 @@ export default function EditorClientPage() {
 
   // Sketch tool state
   const [showSketchTool, setShowSketchTool] = useState(false);
+
+  // If editing a local snapshot (?local=...), record detailed revisions into local storage
+  const [localEditingId, setLocalEditingId] = useState<string | null>(null);
 
   // History is managed via HistoryContext; pushes occur in action handlers.
 
@@ -145,6 +150,7 @@ export default function EditorClientPage() {
     try {
       const snap = listLocalProjects().find(p => p.id === localId);
       if (snap) {
+        setLocalEditingId(localId);
         if (snap.primaryImage) setPrimaryImage(snap.primaryImage);
         if (snap.generatedImage) setGeneratedImage(snap.generatedImage);
         setReferenceImages(snap.referenceImages || []);
@@ -158,12 +164,72 @@ export default function EditorClientPage() {
     }
   }, [searchParams, setPrimaryImage, setGeneratedImage, setReferenceImages, setPrompt, setAdjustments, setCurrentFilter]);
 
+  // Local revisions: mapper for history actions -> revision types
+  const mapHistoryActionToRevisionType = (action?: string | null): LocalProjectRevision['type'] | null => {
+    switch (action) {
+      case 'set_primary_image': return 'set_primary_image';
+      case 'upload_reference': return 'upload_reference';
+      case 'image_generation': return 'image_generation';
+      case 'sketch_generation': return 'sketch_generation';
+      case 'area_edit_generation': return 'area_edit_generation';
+      case 'adjustments_change': return 'adjustments_change';
+      case 'filter_apply': return 'filter_apply';
+      default: return null;
+    }
+  };
+
+  // Helper: append a detailed local revision snapshot for the current localEditingId
+  const recordLocalRevision = (
+    type: LocalProjectRevision['type'],
+    label: string,
+    payload?: Record<string, unknown> | null,
+  ) => {
+    if (!localEditingId) return;
+    try {
+      appendLocalProjectRevision(localEditingId, {
+        id: `rev-${uuidv4()}`,
+        label,
+        timestamp: Date.now(),
+        type,
+        snapshot: {
+          primaryImage: primaryImage ?? null,
+          generatedImage: generatedImage ?? null,
+          referenceImages,
+          prompt,
+          adjustments,
+          filter: currentFilter ?? null,
+        },
+        payload: payload ?? null,
+      });
+    } catch (e) {
+      console.warn('Failed to append local revision:', e);
+    }
+  };
+
   // History-aware setters
   const applyAdjustments = (next: ImageAdjustments, label?: string) => {
     const prev = adjustments;
     if (JSON.stringify(prev) === JSON.stringify(next)) return;
     setAdjustments(next);
     push(createAdjustmentsChangeOp(prev, next, setAdjustments, label));
+    recordLocalRevision('adjustments_change', label || 'Adjustments Change', { next });
+
+    // Push adjustments to Supabase if a remote project is loaded
+    if (user?.id && projectId) {
+      void (async () => {
+        try {
+          const dataPayload: any = {
+            prompt: prompt ?? null,
+            adjustments: next,
+            filter: currentFilter ?? null,
+            references: (referenceImages || []).map(r => ({ id: r.id, name: r.name })),
+          };
+          await updateProject(projectId, { data: dataPayload as any });
+        } catch (e) {
+          console.warn('Adjustments remote update failed:', e);
+        }
+      })();
+    }
   };
 
   const applyFilter = (filterId: string) => {
@@ -173,6 +239,24 @@ export default function EditorClientPage() {
     // Apply immediately then push op
     applyFn();
     push(createStateSetterOp('Filter Apply', 'filter_apply', applyFn, undoFn, { prev: prevFilter, next: filterId }, ['filters']));
+    recordLocalRevision('filter_apply', 'Filter Apply', { prev: prevFilter, next: filterId });
+
+    // Push filter change to Supabase if a remote project is loaded
+    if (user?.id && projectId) {
+      void (async () => {
+        try {
+          const dataPayload: any = {
+            prompt: prompt ?? null,
+            adjustments,
+            filter: filterId,
+            references: (referenceImages || []).map(r => ({ id: r.id, name: r.name })),
+          };
+          await updateProject(projectId, { data: dataPayload as any });
+        } catch (e) {
+          console.warn('Filter remote update failed:', e);
+        }
+      })();
+    }
   };
 
   // Handlers
@@ -185,11 +269,24 @@ export default function EditorClientPage() {
     push(createStateSetterOp('Set Primary Image', 'set_primary_image', applyFn, undoFn, { prev: prev?.url, next: image?.url }, ['images']));
     setActiveTab('prompt');
 
+    // Record local revision
+    recordLocalRevision('set_primary_image', 'Set Primary Image', { name: image?.name, size: image?.size });
+
     // Persist to Supabase storage if we have auth+project
     try {
-      if (user?.id && projectId && image.url.startsWith('data:')) {
-        await persistPrimaryImage(image.url, user.id, projectId);
+      if (user?.id && projectId) {
+        let primaryPublicUrl: string | null = null;
+        if (image.url.startsWith('data:')) {
+          const { publicUrl } = await persistPrimaryImage(image.url, user.id, projectId);
+          primaryPublicUrl = publicUrl || null;
+        } else if (image.url.startsWith('http')) {
+          primaryPublicUrl = image.url;
+        }
         await appendProjectEvent(projectId, { type: 'upload_primary', url: image.url, meta: { name: image.name, size: image.size } });
+        // Set thumbnail to primary if no generated yet
+        await updateProject(projectId, {
+          thumbnail_url: primaryPublicUrl || null,
+        });
       }
     } catch (e) {
       console.warn('Primary image persist failed:', e);
@@ -199,11 +296,25 @@ export default function EditorClientPage() {
   const handleReferenceImageUpload = async (image: StoredImage) => {
     setReferenceImages([...referenceImages, image]);
 
+    // Record local revision
+    recordLocalRevision('upload_reference', 'Upload Reference', { name: image?.name, id: image?.id });
+
     // Persist to Supabase storage if available
     try {
-      if (user?.id && projectId && image.url.startsWith('data:')) {
-        await persistReferenceImage(image.url, user.id, projectId, `${image.id}.png`);
+      if (user?.id && projectId) {
+        if (image.url.startsWith('data:')) {
+          await persistReferenceImage(image.url, user.id, projectId, `${image.id}.png`);
+        }
         await appendProjectEvent(projectId, { type: 'upload_reference', url: image.url, meta: { name: image.name, size: image.size } });
+        // Update references array in project data
+        const refs = [...referenceImages, image].map(r => ({ id: r.id, name: r.name }));
+        const dataPayload: any = {
+          prompt: prompt ?? null,
+          adjustments: adjustments ?? null,
+          filter: currentFilter ?? null,
+          references: refs,
+        };
+        await updateProject(projectId, { data: dataPayload as any });
       }
     } catch (e) {
       console.warn('Reference image persist failed:', e);
@@ -260,10 +371,29 @@ export default function EditorClientPage() {
         applyFn();
         push(createStateSetterOp('Image Generation', 'image_generation', applyFn, undoFn, { prev: prev?.url, next: nextImg.url, prompt: inputPrompt }, ['ai', 'generation']));
 
+        // Record local revision
+        recordLocalRevision('image_generation', 'Image Generation', { prompt: inputPrompt });
+
         // Persist generated image to Supabase storage (keep local base64 for processing)
         try {
-          if (user?.id && projectId && nextImg.url.startsWith('data:')) {
-            await persistGeneratedImage(nextImg.url, user.id, projectId, inputPrompt);
+          if (user?.id && projectId) {
+            let generatedPublicUrl: string | null = null;
+            if (nextImg.url.startsWith('data:')) {
+              const { publicUrl } = await persistGeneratedImage(nextImg.url, user.id, projectId, inputPrompt);
+              generatedPublicUrl = publicUrl || null;
+            } else if (nextImg.url.startsWith('http')) {
+              generatedPublicUrl = nextImg.url;
+            }
+            const dataPayload: any = {
+              prompt: inputPrompt ?? null,
+              adjustments,
+              filter: currentFilter ?? null,
+              references: (referenceImages || []).map(r => ({ id: r.id, name: r.name })),
+            };
+            await updateProject(projectId, {
+              data: dataPayload as any,
+              thumbnail_url: generatedPublicUrl || null,
+            });
           }
         } catch (e) {
           console.warn('Generated image persist failed:', e);
@@ -280,9 +410,9 @@ export default function EditorClientPage() {
     }
   };
 
-     // Create a new project and save current project state to Supabase + local snapshot
+    // Create a new project and persist current project state to Supabase and update existing local snapshot (no duplicates)
     const handleNewProject = async () => {
-      // Snapshot current state for local persistence and optional remote save
+      // Snapshot current editor state
       const prevPrimary = primaryImage;
       const prevGenerated = generatedImage;
       const prevReferences = [...referenceImages];
@@ -290,61 +420,168 @@ export default function EditorClientPage() {
       const prevProjectId = projectId;
       const prevAdjustments = adjustments;
       const prevFilter = currentFilter;
-    
-      // Build and store a local "recent project" snapshot so it appears instantly on Dashboard
+
+      // Update an existing local snapshot instead of creating duplicates
       try {
-        const localId = `local-${uuidv4()}`;
-        const name = prevGenerated?.name || prevPrimary?.name || 'Untitled Local Project';
-        const snapshot = buildLocalProjectSnapshot({
-          id: localId,
-          name,
-          primaryImage: prevPrimary ?? null,
-          generatedImage: prevGenerated ?? null,
-          referenceImages: prevReferences,
-          prompt: prevPrompt ?? null,
-          adjustments: prevAdjustments ?? null,
-          filter: prevFilter ?? null,
-          events: [
-            { label: 'Saved locally before New Project', timestamp: Date.now(), action: 'save_before_new', payload: { projectId: prevProjectId } },
-          ],
-        });
-        saveLocalProject(snapshot);
-        appendLocalProjectEvent(localId, { label: 'New Project click', timestamp: Date.now(), action: 'click_new_project' });
+        const nowEvent = { label: 'Saved locally before New Project', timestamp: Date.now(), action: 'save_before_new', payload: { projectId: prevProjectId } } as const;
+
+        if (localEditingId) {
+          // Update current local entry
+          updateLocalProject(localEditingId, {
+            primaryImage: prevPrimary ?? null,
+            generatedImage: prevGenerated ?? null,
+            referenceImages: prevReferences,
+            prompt: prevPrompt ?? null,
+            adjustments: prevAdjustments ?? null,
+            filter: prevFilter ?? null,
+            thumbnailDataUrl: prevGenerated?.url || prevPrimary?.url || null,
+          });
+          appendLocalProjectEvent(localEditingId, nowEvent as any);
+
+          // Append history ops as revisions
+          if (Array.isArray(past) && past.length > 0) {
+            for (const op of past) {
+              const type = mapHistoryActionToRevisionType(op.meta?.action) ?? 'initial_snapshot';
+              appendLocalProjectRevision(localEditingId, {
+                id: `rev-${uuidv4()}`,
+                label: op.label,
+                timestamp: op.timestamp,
+                type,
+                snapshot: {
+                  primaryImage: prevPrimary ?? null,
+                  generatedImage: prevGenerated ?? null,
+                  referenceImages: prevReferences,
+                  prompt: prevPrompt ?? null,
+                  adjustments: prevAdjustments ?? null,
+                  filter: prevFilter ?? null,
+                },
+                payload: op.meta?.payload ?? null,
+              });
+            }
+          }
+        } else {
+          // Try to find a local entry linked to this remote project, else create one
+          const existingLinked = prevProjectId
+            ? listLocalProjects().find(lp => lp.remoteId === prevProjectId)
+            : null;
+
+          if (existingLinked) {
+            updateLocalProject(existingLinked.id, {
+              primaryImage: prevPrimary ?? null,
+              generatedImage: prevGenerated ?? null,
+              referenceImages: prevReferences,
+              prompt: prevPrompt ?? null,
+              adjustments: prevAdjustments ?? null,
+              filter: prevFilter ?? null,
+              thumbnailDataUrl: prevGenerated?.url || prevPrimary?.url || null,
+              status: 'synced',
+            });
+            appendLocalProjectEvent(existingLinked.id, nowEvent as any);
+
+            if (Array.isArray(past) && past.length > 0) {
+              for (const op of past) {
+                const type = mapHistoryActionToRevisionType(op.meta?.action) ?? 'initial_snapshot';
+                appendLocalProjectRevision(existingLinked.id, {
+                  id: `rev-${uuidv4()}`,
+                  label: op.label,
+                  timestamp: op.timestamp,
+                  type,
+                  snapshot: {
+                    primaryImage: prevPrimary ?? null,
+                    generatedImage: prevGenerated ?? null,
+                    referenceImages: prevReferences,
+                    prompt: prevPrompt ?? null,
+                    adjustments: prevAdjustments ?? null,
+                    filter: prevFilter ?? null,
+                  },
+                  payload: op.meta?.payload ?? null,
+                });
+              }
+            }
+          } else {
+            const localId = `local-${uuidv4()}`;
+            const name = prevGenerated?.name || prevPrimary?.name || 'Untitled Local Project';
+            const snapshot = buildLocalProjectSnapshot({
+              id: localId,
+              name,
+              primaryImage: prevPrimary ?? null,
+              generatedImage: prevGenerated ?? null,
+              referenceImages: prevReferences,
+              prompt: prevPrompt ?? null,
+              adjustments: prevAdjustments ?? null,
+              filter: prevFilter ?? null,
+              events: [nowEvent as any],
+            });
+            saveLocalProject(snapshot);
+            // Link to remote if present and mark synced
+            if (prevProjectId) {
+              updateLocalProject(localId, { remoteId: prevProjectId, status: 'synced' });
+            }
+          }
+        }
       } catch (e) {
-        console.warn('Local snapshot save failed:', e);
+        console.warn('Local snapshot update before New Project failed:', e);
       }
-    
-      // Immediately clear editor state so canvas disappears at click time
+
+      // Immediately clear editor state
       resetEditor();
       setShowLassoTool(false);
       setShowSketchTool(false);
       setSelectionData(null);
-      setActiveTab('upload'); // Force Upload tab
+      setActiveTab('upload');
       setIsSidebarCollapsed(false);
       setError(null);
-      clear(); // Clear history stacks to prevent undo bringing back old canvas
-    
+      clear();
+
       try {
-        // Best-effort remote persistence of previous artifacts (non-blocking for UI freshness)
+        // Best-effort remote persistence of previous artifacts and editor state
         if (user?.id && prevProjectId) {
-          if (prevPrimary?.url?.startsWith('data:')) {
-            await persistPrimaryImage(prevPrimary.url, user.id, prevProjectId);
+          let primaryPublicUrl: string | null = null;
+          let generatedPublicUrl: string | null = null;
+
+          if (prevPrimary?.url) {
+            if (prevPrimary.url.startsWith('data:')) {
+              const { publicUrl } = await persistPrimaryImage(prevPrimary.url, user.id, prevProjectId);
+              primaryPublicUrl = publicUrl || null;
+            } else if (prevPrimary.url.startsWith('http')) {
+              primaryPublicUrl = prevPrimary.url;
+            }
           }
-          if (prevGenerated?.url?.startsWith('data:')) {
-            await persistGeneratedImage(prevGenerated.url, user.id, prevProjectId, prevPrompt);
+          if (prevGenerated?.url) {
+            if (prevGenerated.url.startsWith('data:')) {
+              const { publicUrl } = await persistGeneratedImage(prevGenerated.url, user.id, prevProjectId, prevPrompt);
+              generatedPublicUrl = publicUrl || null;
+            } else if (prevGenerated.url.startsWith('http')) {
+              generatedPublicUrl = prevGenerated.url;
+            }
           }
           for (const ref of prevReferences) {
             if (ref.url.startsWith('data:')) {
               await persistReferenceImage(ref.url, user.id, prevProjectId, `${ref.id}.png`);
             }
           }
+
+          // Update JSON data and thumbnail on project row
+          const dataPayload: any = {
+            prompt: prevPrompt ?? null,
+            adjustments: prevAdjustments ?? null,
+            filter: prevFilter ?? null,
+            references: prevReferences.map(r => ({ id: r.id, name: r.name })),
+          };
+          await updateProject(prevProjectId, {
+            data: dataPayload as any,
+            thumbnail_url: generatedPublicUrl || primaryPublicUrl || null,
+            primary_image_url: primaryPublicUrl ?? undefined,
+            generated_image_url: generatedPublicUrl ?? undefined,
+          });
+
           await appendProjectEvent(prevProjectId, { type: 'update', prompt: prevPrompt, meta: { action: 'save_before_new' } });
         }
-    
-        // Create new project
+
+        // Create a new remote project to continue
         const res = await fetch('/api/projects/new', { method: 'POST' });
         const json = await res.json();
-    
+
         if (json?.id) {
           setProjectId(json.id);
           router.push(`/editor?project=${json.id}`);
@@ -364,6 +601,190 @@ export default function EditorClientPage() {
     }
     // Redirect to new export page
     router.push('/editor/export');
+  };
+
+  // Save or update a local snapshot when exiting the editor (no duplicate local entries) and push state to Supabase
+  const saveSnapshotIfPresent = async (reasonLabel: string) => {
+    // Only save if we have something meaningful
+    const hasPrimary = !!primaryImage;
+    const hasGenerated = !!generatedImage;
+    const hasRefs = (referenceImages || []).length > 0;
+    const hasPromptOrState = !!prompt || !!adjustments || !!currentFilter;
+
+    if (!hasPrimary && !hasGenerated && !hasRefs && !hasPromptOrState) {
+      return; // nothing to save
+    }
+
+    try {
+      const nowEvent = { label: reasonLabel, timestamp: Date.now(), action: 'save_on_exit', payload: projectId ? { projectId } : undefined } as const;
+
+      if (localEditingId) {
+        // Update the existing local entry being edited
+        updateLocalProject(localEditingId, {
+          primaryImage: primaryImage ?? null,
+          generatedImage: generatedImage ?? null,
+          referenceImages,
+          prompt: prompt ?? null,
+          adjustments: adjustments ?? null,
+          filter: currentFilter ?? null,
+          thumbnailDataUrl: generatedImage?.url || primaryImage?.url || null,
+        });
+        appendLocalProjectEvent(localEditingId, nowEvent as any);
+
+        if (Array.isArray(past) && past.length > 0) {
+          for (const op of past) {
+            const type = mapHistoryActionToRevisionType(op.meta?.action) ?? 'initial_snapshot';
+            appendLocalProjectRevision(localEditingId, {
+              id: `rev-${uuidv4()}`,
+              label: op.label,
+              timestamp: op.timestamp,
+              type,
+              snapshot: {
+                primaryImage: primaryImage ?? null,
+                generatedImage: generatedImage ?? null,
+                referenceImages,
+                prompt: prompt ?? null,
+                adjustments: adjustments ?? null,
+                filter: currentFilter ?? null,
+              },
+              payload: op.meta?.payload ?? null,
+            });
+          }
+        }
+      } else {
+        // Try to find a local entry linked to this remote project
+        const existingLinked = projectId
+          ? listLocalProjects().find(lp => lp.remoteId === projectId)
+          : null;
+
+        if (existingLinked) {
+          updateLocalProject(existingLinked.id, {
+            primaryImage: primaryImage ?? null,
+            generatedImage: generatedImage ?? null,
+            referenceImages,
+            prompt: prompt ?? null,
+            adjustments: adjustments ?? null,
+            filter: currentFilter ?? null,
+            thumbnailDataUrl: generatedImage?.url || primaryImage?.url || null,
+            status: 'synced',
+          });
+          appendLocalProjectEvent(existingLinked.id, nowEvent as any);
+
+          if (Array.isArray(past) && past.length > 0) {
+            for (const op of past) {
+              const type = mapHistoryActionToRevisionType(op.meta?.action) ?? 'initial_snapshot';
+              appendLocalProjectRevision(existingLinked.id, {
+                id: `rev-${uuidv4()}`,
+                label: op.label,
+                timestamp: op.timestamp,
+                type,
+                snapshot: {
+                  primaryImage: primaryImage ?? null,
+                  generatedImage: generatedImage ?? null,
+                  referenceImages,
+                  prompt: prompt ?? null,
+                  adjustments: adjustments ?? null,
+                  filter: currentFilter ?? null,
+                },
+                payload: op.meta?.payload ?? null,
+              });
+            }
+          }
+        } else {
+          // Create a new local entry and link it to remote if available
+          const localId = `local-${uuidv4()}`;
+          const name = generatedImage?.name || primaryImage?.name || 'Untitled Local Project';
+          const snapshot = buildLocalProjectSnapshot({
+            id: localId,
+            name,
+            primaryImage: primaryImage ?? null,
+            generatedImage: generatedImage ?? null,
+            referenceImages,
+            prompt: prompt ?? null,
+            adjustments: adjustments ?? null,
+            filter: currentFilter ?? null,
+            events: [nowEvent as any],
+          });
+          saveLocalProject(snapshot);
+          if (projectId) {
+            updateLocalProject(localId, { remoteId: projectId, status: 'synced' });
+          }
+
+          if (Array.isArray(past) && past.length > 0) {
+            for (const op of past) {
+              const type = mapHistoryActionToRevisionType(op.meta?.action) ?? 'initial_snapshot';
+              appendLocalProjectRevision(localId, {
+                id: `rev-${uuidv4()}`,
+                label: op.label,
+                timestamp: op.timestamp,
+                type,
+                snapshot: {
+                  primaryImage: primaryImage ?? null,
+                  generatedImage: generatedImage ?? null,
+                  referenceImages,
+                  prompt: prompt ?? null,
+                  adjustments: adjustments ?? null,
+                  filter: currentFilter ?? null,
+                },
+                payload: op.meta?.payload ?? null,
+              });
+            }
+          }
+        }
+      }
+
+      // Also push state to Supabase for remote project
+      if (user?.id && projectId) {
+        let primaryPublicUrl: string | null = null;
+        let generatedPublicUrl: string | null = null;
+
+        if (primaryImage?.url) {
+          if (primaryImage.url.startsWith('data:')) {
+            const { publicUrl } = await persistPrimaryImage(primaryImage.url, user.id, projectId);
+            primaryPublicUrl = publicUrl || null;
+          } else if (primaryImage.url.startsWith('http')) {
+            primaryPublicUrl = primaryImage.url;
+          }
+        }
+        if (generatedImage?.url) {
+          if (generatedImage.url.startsWith('data:')) {
+            const { publicUrl } = await persistGeneratedImage(generatedImage.url, user.id, projectId, prompt);
+            generatedPublicUrl = publicUrl || null;
+          } else if (generatedImage.url.startsWith('http')) {
+            generatedPublicUrl = generatedImage.url;
+          }
+        }
+        for (const ref of referenceImages) {
+          if (ref.url.startsWith('data:')) {
+            await persistReferenceImage(ref.url, user.id, projectId, `${ref.id}.png`);
+          }
+        }
+
+        const dataPayload: any = {
+          prompt: prompt ?? null,
+          adjustments: adjustments ?? null,
+          filter: currentFilter ?? null,
+          references: (referenceImages || []).map(r => ({ id: r.id, name: r.name })),
+        };
+
+        await updateProject(projectId, {
+          data: dataPayload as any,
+          thumbnail_url: generatedPublicUrl || primaryPublicUrl || null,
+          primary_image_url: primaryPublicUrl ?? undefined,
+          generated_image_url: generatedPublicUrl ?? undefined,
+        });
+
+        await appendProjectEvent(projectId, { type: 'update', prompt, meta: { action: 'save_on_exit' } });
+      }
+    } catch (e) {
+      console.warn('Local snapshot save on exit failed:', e);
+    }
+  };
+
+  const handleBackToDashboard = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    await saveSnapshotIfPresent('Saved locally before exiting Editor');
+    router.push('/dashboard');
   };
 
   const handleLassoSelection = () => {
@@ -415,6 +836,10 @@ export default function EditorClientPage() {
         const undoFn = () => setGeneratedImage(prev);
         applyFn();
         push(createStateSetterOp('Sketch Generation', 'image_generation', applyFn, undoFn, { prev: prev?.url, next: nextImg.url, prompt: sketchPrompt }, ['ai', 'sketch']));
+
+        // Record local revision
+        recordLocalRevision('sketch_generation', 'Sketch Generation', { prompt: sketchPrompt });
+
         setActiveTab('adjust');
       } else {
         setError(result.error || 'Failed to generate from sketch');
@@ -466,6 +891,10 @@ export default function EditorClientPage() {
         const undoFn = () => setGeneratedImage(prev);
         applyFn();
         push(createStateSetterOp('Area Edit Generation', 'image_generation', applyFn, undoFn, { prev: prev?.url, next: nextImg.url, areaPrompt }, ['ai', 'area-edit']));
+
+        // Record local revision
+        recordLocalRevision('area_edit_generation', 'Area Edit Generation', { areaPrompt });
+
         setSelectionData(null);
       } else {
         setError(result.error || 'Failed to edit area');
@@ -609,6 +1038,7 @@ export default function EditorClientPage() {
           {/* Back to Dashboard */}
           <Link
             href="/dashboard"
+            onClick={handleBackToDashboard}
             className="relative group/export ml-2 px-4 py-2.5 overflow-hidden rounded-xl"
             title="Back to Dashboard"
           >
